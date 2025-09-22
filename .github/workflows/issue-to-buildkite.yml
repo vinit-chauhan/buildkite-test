@@ -1,0 +1,55 @@
+name: issue → buildkite
+on:
+  issues:
+    types: [opened, labeled, edited, reopened]
+
+jobs:
+  trigger:
+    # gate on label + presence of front-matter (optional)
+    if: >
+      contains(github.event.issue.labels.*.name, 'ai-doc-gen') &&
+      startsWith(github.event.issue.body, '---')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract YAML front-matter
+        id: parse
+        run: |
+          awk 'BEGIN{f=0} /^---$/ {c++} c==1{f=1;next} c==2{exit} f{print}' \
+            <<< "${{ github.event.issue.body }}" > payload.yml
+          echo "frontmatter<<EOF" >> $GITHUB_OUTPUT
+          cat payload.yml >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Trigger Buildkite build
+        env:
+          BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}   # scope: write_builds
+          ORG: your-org-slug
+          PIPELINE: ai-doc-gen-pipeline                   # your pipeline slug
+        run: |
+          jq -n \
+            --arg msg "Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}" \
+            --arg branch "main" \
+            --arg commit "HEAD" \
+            --arg issuenum "${{ github.event.issue.number }}" \
+            --arg issueurl "${{ github.event.issue.html_url }}" \
+            --arg issueyaml "${{ steps.parse.outputs.frontmatter }}" \
+            --arg repo "${{ github.repository }}" \
+            '{
+              message: $msg,
+              branch: $branch,
+              commit: $commit,
+              env: {
+                ISSUE_NUMBER: $issuenum,
+                ISSUE_URL: $issueurl,
+                ISSUE_YAML: $issueyaml,
+                ISSUE_REPO: $repo,
+                ISSUE_EVENT: "opened_or_labeled"
+              }
+            }' > build.json
+
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $BK_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.buildkite.com/v2/organizations/$ORG/pipelines/$PIPELINE/builds" \
+            --data @build.json
+
