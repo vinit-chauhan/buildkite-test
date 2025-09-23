@@ -47,20 +47,9 @@ jobs:
               }
             }' > build.json
 
-          echo "curl -H \"Authorization: Bearer $BK_TOKEN\" \
-            -X \"POST\" \
-            \"https://api.buildkite.com/v2/organizations/$ORG/pipelines/$PIPELINE/builds\" \
-            -H \"Content-Type: application/json\" \
-            -F \"commit=HEAD\" \
-            -F \"branch=main\" \
-            -F \"message=First build :rocket:\" \
-            --data @build.json"
 
           curl -H "Authorization: Bearer $BK_TOKEN" \
             -X "POST" \
             "https://api.buildkite.com/v2/organizations/$ORG/pipelines/$PIPELINE/builds" \
             -H "Content-Type: application/json" \
-            -F "commit=HEAD" \
-            -F "branch=main" \
-            -F "message=First build :rocket:" \
             --data @build.json
