@@ -22,7 +22,7 @@ jobs:
 
       - name: Trigger Buildkite build
         env:
-          BK_TOKEN: ${{ vars.BUILDKITE_API_TOKEN }}   # scope: write_builds
+          BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}   # scope: write_builds
           ORG: vinit-chauhan
           PIPELINE: buildkite-test                   # your pipeline slug
         run: |
