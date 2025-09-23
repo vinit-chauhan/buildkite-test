@@ -22,7 +22,7 @@ jobs:
 
       - name: Trigger Buildkite build
         env:
-          BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}   # scope: write_builds
+          BK_TOKEN: ${{ vars.BUILDKITE_API_TOKEN }}   # scope: write_builds
           ORG: vinit-chauhan
           PIPELINE: buildkite-test                   # your pipeline slug
         run: |
@@ -64,10 +64,3 @@ jobs:
             -F "branch=main" \
             -F "message=First build :rocket:"
             --data @build.json
-
-
-curl -H "Authorization: Bearer $YOUR_REST_API_TOKEN" "https://api.buildkite.com/v2/organizations/vinit-chauhan/pipelines/buildkite-test/builds" \
--X "POST" \
-  -F "commit=HEAD" \
-  -F "branch=main" \
--F "message=First build :rocket:"
