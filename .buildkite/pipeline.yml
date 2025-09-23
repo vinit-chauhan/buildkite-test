@@ -1,0 +1,8 @@
+steps:
+  - label: ":shield: gate + fan-out from GitHub issues"
+    key: gate
+    command: .buildkite/scripts/gate_and_fanout.sh
+    agents: { queue: standard }
+
+  # The matrix and summary steps will be uploaded dynamically by the script above.
+

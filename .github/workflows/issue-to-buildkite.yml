@@ -23,8 +23,8 @@ jobs:
       - name: Trigger Buildkite build
         env:
           BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}   # scope: write_builds
-          ORG: your-org-slug
-          PIPELINE: ai-doc-gen-pipeline                   # your pipeline slug
+          ORG: vinit-chauhan
+          PIPELINE: buildkite-test                   # your pipeline slug
         run: |
           jq -n \
             --arg msg "Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}" \
@@ -47,9 +47,11 @@ jobs:
               }
             }' > build.json
 
-          curl -sSf -X POST \
+          curl -X "POST" \
             -H "Authorization: Bearer $BK_TOKEN" \
-            -H "Content-Type: application/json" \
             "https://api.buildkite.com/v2/organizations/$ORG/pipelines/$PIPELINE/builds" \
+            -H "Content-Type: application/json" \
+            -F "commit=HEAD" \
+            -F "branch=main" \
+            -F "message=First build :rocket:"
             --data @build.json
-
