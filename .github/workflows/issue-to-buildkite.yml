@@ -20,6 +20,17 @@ jobs:
           cat payload.yml >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Debug secret access
+        env:
+          BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}
+        run: |
+          if [ -z "$BK_TOKEN" ]; then
+            echo "❌ BUILDKITE_API_TOKEN secret is not accessible"
+            exit 1
+          else
+            echo "✅ BUILDKITE_API_TOKEN secret is accessible"
+          fi
+
       - name: Trigger Buildkite build
         env:
           BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}   # scope: write_builds
