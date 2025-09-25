@@ -228,23 +228,23 @@ trap 'update_result "failed" "Script exited unexpectedly"' EXIT
 echo ""
 echo "Setting up workspace..."
 
-# Clone elastic/integrations repository
+# Clone repository
 if [[ ! -d "elastic-integrations" ]]; then
-    echo "Cloning elastic/integrations repository..."
+    echo "Cloning ${REPOSITORY_NAME} repository..."
     git clone --depth 1 https://github.com/${REPOSITORY_NAME}.git elastic-integrations
-    add_check_result "repository_clone" "passed" "Successfully cloned elastic/integrations"
+    add_check_result "repository_clone" "passed" "Successfully cloned ${REPOSITORY_NAME}"
 else
     echo "Repository already exists, pulling latest..."
     cd elastic-integrations
     git pull origin main
     cd ..
-    add_check_result "repository_update" "passed" "Successfully updated elastic/integrations"
+    add_check_result "repository_update" "passed" "Successfully updated ${REPOSITORY_NAME}"
 fi
 
 # Check if integration exists
 INTEGRATION_PATH="elastic-integrations/packages/${INTEGRATION}"
 if [[ ! -d "${INTEGRATION_PATH}" ]]; then
-    update_result "failed" "Integration '${INTEGRATION}' not found in elastic/integrations"
+    update_result "failed" "Integration '${INTEGRATION}' not found in ${REPOSITORY_NAME}"
     add_check_result "integration_exists" "failed" "Integration directory not found: ${INTEGRATION_PATH}"
     exit 1
 fi
@@ -304,7 +304,7 @@ CHECK_DETAILS=$(cat "${CHECK_OUTPUT}")
 add_check_result "elastic_package_check" "${CHECK_STATUS}" "${CHECK_MESSAGE}"
 
 # Store detailed output in result
-local temp_file="/tmp/output_update_$$.json"
+temp_file="/tmp/output_update_$$.json"
 jq --arg output "$CHECK_DETAILS" \
    '.check_output = $output' \
    "${RESULT_FILE}" > "${temp_file}" && mv "${temp_file}" "${RESULT_FILE}"
