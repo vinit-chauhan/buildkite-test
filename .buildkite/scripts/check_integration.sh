@@ -10,6 +10,7 @@ echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 
 # Get the integration name from matrix
 INTEGRATION=${INTEGRATION:?}
+REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
 
 echo "Checking integration: ${INTEGRATION}"
 echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
@@ -65,7 +66,7 @@ echo "Setting up workspace..."
 # Clone elastic/integrations repository
 if [[ ! -d "elastic-integrations" ]]; then
     echo "Cloning elastic/integrations repository..."
-    git clone --depth 1 https://github.com/elastic/integrations.git elastic-integrations
+    git clone --depth 1 https://github.com/${REPOSITORY_NAME}.git elastic-integrations
     add_check_result "repository_clone" "passed" "Successfully cloned elastic/integrations"
 else
     echo "Repository already exists, pulling latest..."
@@ -140,7 +141,7 @@ add_check_result "elastic_package_check" "${CHECK_STATUS}" "${CHECK_MESSAGE}"
 # Store detailed output in result
 jq --arg output "$CHECK_DETAILS" \
    '.check_output = $output' \
-   "../../${RESULT_FILE}" > "../../${RESULT_FILE}.tmp" && mv "../../${RESULT_FILE}.tmp" "../../${RESULT_FILE}"
+   "${RESULT_FILE}" > "${RESULT_FILE}.tmp" && mv "${RESULT_FILE}.tmp" "${RESULT_FILE}"
 
 cd - >/dev/null
 
@@ -210,7 +211,7 @@ ${CHECK_DETAILS}
                     jq --arg pr_url "$PR_URL" \
                        --arg branch "$BRANCH_NAME" \
                        '.pr_url = $pr_url | .pr_branch = $branch' \
-                       "../../${RESULT_FILE}" > "../../${RESULT_FILE}.tmp" && mv "../../${RESULT_FILE}.tmp" "../../${RESULT_FILE}"
+                       "${RESULT_FILE}" > "${RESULT_FILE}.tmp" && mv "${RESULT_FILE}.tmp" "${RESULT_FILE}"
                     
                     echo "✅ Created PR: ${PR_URL}"
                 else
