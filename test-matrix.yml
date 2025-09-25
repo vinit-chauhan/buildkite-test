@@ -1,8 +1,0 @@
-steps:
-  - label: ":test_tube: Matrix Test %{matrix.integration}"
-    command: "echo 'Testing integration: ${BUILDKITE_MATRIX_SETUP_INTEGRATION}'"
-    matrix:
-      setup:
-        integration:
-          - "cisco_duo"
-          - "tenable_io"

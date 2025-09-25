@@ -10,33 +10,6 @@ echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 
 # Get the integration name from matrix
 INTEGRATION=${INTEGRATION:?}
-BUILDKITE_MATRIX_INTEGRATION=${INTEGRATION:-}
-
-# Debug: Show all available environment variables
-echo "Matrix-related environment variables:"
-env | grep -i matrix | sort
-echo ""
-echo "All Buildkite environment variables:"
-env | grep '^BUILDKITE_' | sort
-
-if [[ -z "${INTEGRATION}" ]]; then
-    echo "❌ No integration specified in BUILDKITE_MATRIX_SETUP_INTEGRATION"
-    
-    # Try alternative matrix variable patterns
-    if [[ -n "${BUILDKITE_MATRIX_INTEGRATION:-}" ]]; then
-        INTEGRATION="${BUILDKITE_MATRIX_INTEGRATION}"
-        echo "✅ Found integration via BUILDKITE_MATRIX_INTEGRATION: ${INTEGRATION}"
-    elif [[ -n "${matrix_integration:-}" ]]; then
-        INTEGRATION="${matrix_integration}"
-        echo "✅ Found integration via matrix_integration: ${INTEGRATION}"
-    else
-        echo "❌ No matrix integration variable found"
-        echo "This suggests the job is not running as a matrix job"
-        echo ""
-        echo "Pipeline may have failed to upload correctly or matrix syntax is incorrect"
-        exit 1
-    fi
-fi
 
 echo "Checking integration: ${INTEGRATION}"
 echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
@@ -45,7 +18,7 @@ echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
 mkdir -p results
 
 # Initialize result file
-RESULT_FILE="results/${INTEGRATION}.json"
+RESULT_FILE="$(pwd)/results/${INTEGRATION}.json"
 cat > "${RESULT_FILE}" << EOF
 {
   "integration": "${INTEGRATION}",
@@ -118,7 +91,7 @@ if ! command -v elastic-package >/dev/null 2>&1; then
     echo "Installing elastic-package..."
     
     # Try to download and install elastic-package
-    ELASTIC_PACKAGE_VERSION="0.98.0"  # Use a known stable version
+    ELASTIC_PACKAGE_VERSION="0.115.0"  # Use a known stable version
     DOWNLOAD_URL="https://github.com/elastic/elastic-package/releases/download/v${ELASTIC_PACKAGE_VERSION}/elastic-package_${ELASTIC_PACKAGE_VERSION}_linux_amd64.tar.gz"
     
     mkdir -p ~/bin
