@@ -1,8 +1,6 @@
 steps:
-  - label: ":shield: run elastic-package check"
-    key: gate
-    command: .buildkite/scripts/gate_and_fanout.sh
-    agents: { queue: default }
-
-  # The matrix and summary steps will be uploaded dynamically by the script above.
+  - label: ":gear: Setup and Orchestrate"
+    command: ".buildkite/scripts/orchestrate.sh"
+    agents:
+      queue: "default"
 

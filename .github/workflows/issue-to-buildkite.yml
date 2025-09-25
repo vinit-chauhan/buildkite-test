@@ -1,57 +1,77 @@
-name: issue → buildkite
+name: Issue to Buildkite Pipeline
+
 on:
   issues:
     types: [opened, labeled, edited, reopened]
 
 jobs:
-  trigger:
-    # gate on label + presence of front-matter (optional)
-    if: >
-      contains(github.event.issue.labels.*.name, 'ai-doc-gen') &&
-      startsWith(github.event.issue.body, '---')
+  trigger-buildkite:
+    if: contains(github.event.issue.labels.*.name, 'ai-doc-gen')
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Extract YAML front-matter
-        id: parse
+      - name: Extract YAML front-matter from issue
+        id: extract-yaml
         run: |
-          awk 'BEGIN{f=0} /^---$/ {c++} c==1{f=1;next} c==2{exit} f{print}' \
-            <<< "${{ github.event.issue.body }}" > payload.yml
-          echo "frontmatter<<EOF" >> $GITHUB_OUTPUT
-          cat payload.yml >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Create a temporary file with the issue body
+          cat << 'EOF' > issue_body.txt
+          ${{ github.event.issue.body }}
+          EOF
+          
+          # Extract YAML front-matter (between --- markers)
+          awk 'BEGIN{found=0; yaml=""} 
+               /^---[ \t]*$/ {
+                 if(found==0) {found=1; next} 
+                 else if(found==1) {found=2; exit}
+               } 
+               found==1 {yaml=yaml $0 "\n"} 
+               END{print yaml}' issue_body.txt > extracted.yaml
+          
+          # Check if we have valid YAML
+          if [ -s extracted.yaml ]; then
+            echo "Found YAML front-matter:"
+            cat extracted.yaml
+            
+            # Parse integrations using yq
+            if command -v yq >/dev/null 2>&1; then
+              INTEGRATIONS=$(yq -o=json '.integrations // []' extracted.yaml)
+            else
+              # Install yq
+              sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+              sudo chmod +x /usr/local/bin/yq
+              INTEGRATIONS=$(yq -o=json '.integrations // []' extracted.yaml)
+            fi
+            
+            echo "Parsed integrations: $INTEGRATIONS"
+            
+            # Only proceed if we have integrations
+            if [ "$INTEGRATIONS" != "[]" ] && [ "$INTEGRATIONS" != "null" ]; then
+              echo "integrations-json=$INTEGRATIONS" >> $GITHUB_OUTPUT
+              echo "has-integrations=true" >> $GITHUB_OUTPUT
+            else
+              echo "No integrations found in YAML"
+              echo "has-integrations=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No YAML front-matter found"
+            echo "has-integrations=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Trigger Buildkite build
-        env:
-          BK_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}   # scope: write_builds
-          ORG: vinit-chauhan
-          PIPELINE: buildkite-test                   # your pipeline slug
+      - name: Trigger Buildkite Pipeline
+        if: steps.extract-yaml.outputs.has-integrations == 'true'
         run: |
-          jq -n \
-            --arg msg "Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}" \
-            --arg branch "main" \
-            --arg commit "HEAD" \
-            --arg issuenum "${{ github.event.issue.number }}" \
-            --arg issueurl "${{ github.event.issue.html_url }}" \
-            --arg issueyaml "${{ steps.parse.outputs.frontmatter }}" \
-            --arg repo "${{ github.repository }}" \
-            --arg githubtoken "${{ secrets.GITHUB_TOKEN }}" \
-            '{
-              message: $msg,
-              branch: $branch,
-              commit: $commit,
-              env: {
-                ISSUE_NUMBER: $issuenum,
-                ISSUE_URL: $issueurl,
-                ISSUE_YAML: $issueyaml,
-                ISSUE_REPO: $repo,
-                ISSUE_EVENT: "opened_or_labeled",
-                GITHUB_TOKEN: $githubtoken
-              }
-            }' > build.json
-
-
-          curl -H "Authorization: Bearer $BK_TOKEN" \
-            -X "POST" \
-            "https://api.buildkite.com/v2/organizations/$ORG/pipelines/$PIPELINE/builds" \
+          curl -X POST "https://api.buildkite.com/v2/organizations/${{ vars.BUILDKITE_ORG }}/pipelines/${{ vars.BUILDKITE_PIPELINE }}/builds" \
+            -H "Authorization: Bearer ${{ secrets.BUILDKITE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
-            --data @build.json
+            -d '{
+              "commit": "HEAD",
+              "branch": "main",
+              "message": "Check integrations from issue #${{ github.event.issue.number }}",
+              "env": {
+                "ISSUE_NUMBER": "${{ github.event.issue.number }}",
+                "ISSUE_URL": "${{ github.event.issue.html_url }}",
+                "ISSUE_REPO": "${{ github.repository }}",
+                "INTEGRATIONS_JSON": ${{ toJson(steps.extract-yaml.outputs.integrations-json) }},
+                "GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
+              }
+            }'
