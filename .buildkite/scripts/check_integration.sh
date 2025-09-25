@@ -10,21 +10,7 @@ set -euo pipefail
 INTEGRATION=${INTEGRATION:?}
 REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
 
-echo "=== Integration Check Script ==="
-echo "Build    cd elastic-integrations
-    
-    # Set up GitHub authentication for pushing
-    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
-    
-    # Install and authenticate GitHub CLI
-    if ! setup_github_cli; then
-        echo "⚠️ Could not set up GitHub CLI, will skip PR creation"
-        add_check_result "pr_setup" "failed" "GitHub CLI setup failed"
-        cd - >/dev/null
-        return
-    fiLDKITE_BUILD_NUMBER:-unknown}"
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
-
 echo "Checking integration: ${INTEGRATION}"
 echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
 
@@ -97,7 +83,7 @@ setup_github_cli() {
     
     # Authenticate GitHub CLI
     echo "Authenticating GitHub CLI..."
-    if echo "${GITHUB_TOKEN}" | gh auth login --with-token; then
+    if echo "${GITHUB_PR_TOKEN}" | gh auth login --with-token; then
         add_check_result "gh_auth" "passed" "Successfully authenticated GitHub CLI"
         echo "✅ GitHub CLI authenticated successfully"
         return 0
@@ -449,7 +435,7 @@ else
     cd elastic-integrations
     
     # Set up GitHub authentication for pushing
-    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
+    git remote set-url origin "https://x-access-token:${GITHUB_PR_TOKEN}@github.com/${REPOSITORY_NAME}.git"
     
     # Install and authenticate GitHub CLI
     if ! setup_github_cli; then
