@@ -14,7 +14,7 @@ missing_vars=()
 [[ -z "${ISSUE_URL:-}" ]] && missing_vars+=("ISSUE_URL") 
 [[ -z "${ISSUE_REPO:-}" ]] && missing_vars+=("ISSUE_REPO")
 [[ -z "${INTEGRATIONS_JSON:-}" ]] && missing_vars+=("INTEGRATIONS_JSON")
-[[ -z "${GITHUB_TOKEN:-}" ]] && missing_vars+=("GITHUB_TOKEN")
+[[ -z "${GITHUB_TOKEN:-}" ]] && missing_vars+=("PR_TOKEN")
 
 if [[ ${#missing_vars[@]} -gt 0 ]]; then
     echo "❌ Missing required environment variables:"
