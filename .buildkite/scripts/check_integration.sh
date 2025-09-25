@@ -10,7 +10,18 @@ set -euo pipefail
 # Runs in matrix job, gets integration name from BUILDKITE_MATRIX_SETUP_INTEGRATION
 
 echo "=== Integration Check Script ==="
-echo "Build: ${BUILDKITE_BUILD_NUMBER:-unknown}"
+echo "Build    cd elastic-integrations
+    
+    # Set up GitHub authentication for pushing
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
+    
+    # Install and authenticate GitHub CLI
+    if ! setup_github_cli; then
+        echo "⚠️ Could not set up GitHub CLI, will skip PR creation"
+        add_check_result "pr_setup" "failed" "GitHub CLI setup failed"
+        cd - >/dev/null
+        return
+    fiLDKITE_BUILD_NUMBER:-unknown}"
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 
 # Get the integration name from matrix
@@ -64,6 +75,40 @@ add_check_result() {
        --arg message "$check_message" \
        '.checks += [{"name": $name, "status": $status, "message": $message}]' \
        "${RESULT_FILE}" > "${temp_file}" && mv "${temp_file}" "${RESULT_FILE}"
+}
+
+# Function to install and authenticate GitHub CLI
+setup_github_cli() {
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "Installing GitHub CLI..."
+        if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+           && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+           && sudo apt update \
+           && sudo apt install gh -y; then
+            
+            add_check_result "gh_install" "passed" "Successfully installed GitHub CLI"
+            echo "✅ GitHub CLI installed successfully"
+        else
+            add_check_result "gh_install" "failed" "Failed to install GitHub CLI"
+            echo "❌ Failed to install GitHub CLI"
+            return 1
+        fi
+    else
+        add_check_result "gh_install" "passed" "GitHub CLI already available"
+        echo "✅ GitHub CLI already available"
+    fi
+    
+    # Authenticate GitHub CLI
+    echo "Authenticating GitHub CLI..."
+    if echo "${GITHUB_TOKEN}" | gh auth login --with-token; then
+        add_check_result "gh_auth" "passed" "Successfully authenticated GitHub CLI"
+        echo "✅ GitHub CLI authenticated successfully"
+        return 0
+    else
+        add_check_result "gh_auth" "failed" "Failed to authenticate GitHub CLI"
+        echo "❌ Failed to authenticate GitHub CLI"
+        return 1
+    fi
 }
 
 # Function to run elastic-package changelog and build, then create PR
@@ -409,8 +454,13 @@ else
     # Set up GitHub authentication for pushing
     git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
     
-    # Authenticate GitHub CLI
-    echo "${GITHUB_TOKEN}" | gh auth login --with-token
+    # Install and authenticate GitHub CLI
+    if ! setup_github_cli; then
+        echo "⚠️ Could not set up GitHub CLI for enhancement PR"
+        add_check_result "enhancement_pr" "failed" "GitHub CLI setup failed"
+        cd - >/dev/null
+        return
+    fi
     
     # Create enhancement branch
     BRANCH_NAME="enhance-${INTEGRATION}-issue-${ISSUE_NUMBER:-$(date +%s)}"
@@ -464,43 +514,15 @@ ${CHECK_DETAILS}
                     add_check_result "pr_creation" "passed" "Created PR: ${PR_URL}"
                     
                     # Update result with PR info
+                    local temp_file="/tmp/pr_result_$$.json"
                     jq --arg pr_url "$PR_URL" \
                        --arg branch "$BRANCH_NAME" \
                        '.pr_url = $pr_url | .pr_branch = $branch' \
-                       "${RESULT_FILE}" > "${RESULT_FILE}.tmp" && mv "${RESULT_FILE}.tmp" "${RESULT_FILE}"
+                       "${RESULT_FILE}" > "${temp_file}" && mv "${temp_file}" "${RESULT_FILE}"
                     
                     echo "✅ Created PR: ${PR_URL}"
                 else
                     add_check_result "pr_creation" "failed" "GitHub CLI failed to create PR"
-                fi
-            else
-                echo "Installing GitHub CLI..."
-                if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-                   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-                   && sudo apt update \
-                   && sudo apt install gh; then
-                    
-                    # Set up gh auth
-                    echo "${GITHUB_TOKEN}" | gh auth login --with-token
-                    
-                    # Retry PR creation
-                    if gh pr create \
-                        --title "Fix: elastic-package check failures for ${INTEGRATION}" \
-                        --body "Automated fix for elastic-package check failures.
-                        
-Related to: ${ISSUE_URL:-}
-Build: ${BUILDKITE_BUILD_URL:-}" \
-                        --head "${BRANCH_NAME}" \
-                        --base "main"; then
-                        
-                        PR_URL=$(gh pr view --json url --jq '.url')
-                        add_check_result "pr_creation" "passed" "Created PR: ${PR_URL}"
-                        echo "✅ Created PR: ${PR_URL}"
-                    else
-                        add_check_result "pr_creation" "failed" "Failed to create PR even after installing gh"
-                    fi
-                else
-                    add_check_result "pr_creation" "failed" "Could not install GitHub CLI"
                 fi
             fi
         else
