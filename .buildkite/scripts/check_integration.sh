@@ -6,8 +6,9 @@ mkdir -p results
 RESULT_FILE="$(pwd)/results/${INTEGRATION}.json"
 set -euo pipefail
 
-# Script to check a single integration using elastic-package
-# Runs in matrix job, gets integration name from BUILDKITE_MATRIX_SETUP_INTEGRATION
+# Get the integration name from matrix
+INTEGRATION=${INTEGRATION:?}
+REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
 
 echo "=== Integration Check Script ==="
 echo "Build    cd elastic-integrations
@@ -23,10 +24,6 @@ echo "Build    cd elastic-integrations
         return
     fiLDKITE_BUILD_NUMBER:-unknown}"
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
-
-# Get the integration name from matrix
-INTEGRATION=${INTEGRATION:?}
-REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
 
 echo "Checking integration: ${INTEGRATION}"
 echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
