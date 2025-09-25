@@ -443,7 +443,7 @@ else
         echo "⚠️ Could not set up GitHub CLI for enhancement PR"
         add_check_result "enhancement_pr" "failed" "GitHub CLI setup failed"
         cd - >/dev/null
-        return
+        exit 2
     fi
     
     # Create enhancement branch
@@ -478,19 +478,7 @@ Build: ${BUILDKITE_BUILD_URL:-}"
             if command -v gh >/dev/null 2>&1; then
                 if gh pr create \
                     --title "Fix: elastic-package check failures for ${INTEGRATION}" \
-                    --body "This PR addresses check failures found by elastic-package for the ${INTEGRATION} integration.
-
-Related to: ${ISSUE_URL:-}
-Build: ${BUILDKITE_BUILD_URL:-}
-
-## Changes
-- Added documentation of check failures
-- Placeholder for manual fixes needed
-
-## Check Output
-\`\`\`
-${CHECK_DETAILS}
-\`\`\`" \
+                    --body "This PR addresses check failures found by elastic-package for the ${INTEGRATION} integration.\
                     --head "${BRANCH_NAME}" \
                     --base "main"; then
                     
