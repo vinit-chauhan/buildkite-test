@@ -115,21 +115,43 @@ if [[ -n "${ISSUE_YAML:-}" ]]; then
   echo "Using YAML from GitHub Actions environment"
   echo "$ISSUE_YAML" > work/issue.yaml
 else
-  # Fallback: extract from full issue body if available, or create test data
-  echo "ISSUE_YAML is empty, trying fallback options..."
+  echo "ISSUE_YAML is empty, fetching issue content from GitHub API..."
   
-  # Check if we have any issue body data
-  if [[ -n "${ISSUE_BODY:-}" ]]; then
-    echo "Extracting YAML from issue body"
-    echo "$ISSUE_BODY" > work/issue_body.txt
-    awk 'BEGIN{f=0} /^---[ \t]*$/{c++} c==1{f=1;next} c==2{exit} f{print}' work/issue_body.txt > work/issue.yaml || true
+  # We have ISSUE_NUMBER, ISSUE_REPO, and GITHUB_TOKEN, so fetch the issue
+  if [[ -n "${GITHUB_TOKEN:-}" && -n "${ISSUE_REPO:-}" && -n "${ISSUE_NUMBER:-}" ]]; then
+    echo "Fetching issue #${ISSUE_NUMBER} from ${ISSUE_REPO}..."
+    
+    # Install curl if not available
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "Installing curl..."
+      apt-get update && apt-get install -y curl
+    fi
+    
+    # Fetch issue content from GitHub API
+    ISSUE_RESPONSE=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+      "https://api.github.com/repos/${ISSUE_REPO}/issues/${ISSUE_NUMBER}")
+    
+    if [[ $? -eq 0 ]]; then
+      # Extract issue body
+      ISSUE_BODY=$(echo "$ISSUE_RESPONSE" | jq -r '.body // ""')
+      echo "Issue body length: ${#ISSUE_BODY}"
+      
+      # Extract YAML front-matter from issue body
+      echo "$ISSUE_BODY" > work/issue_body.txt
+      awk 'BEGIN{f=0} /^---[ \t]*$/{c++} c==1{f=1;next} c==2{exit} f{print}' work/issue_body.txt > work/issue.yaml || true
+      
+      echo "Extracted YAML:"
+      cat work/issue.yaml || echo "No YAML found"
+    else
+      echo "Failed to fetch issue from GitHub API"
+      exit 1
+    fi
   else
-    # For testing: create a sample YAML if nothing is available
-    echo "No issue data found, creating test YAML for debugging"
-    cat > work/issue.yaml <<EOF
-integrations:
-  - test-integration
-EOF
+    echo "Missing required variables for GitHub API call"
+    echo "GITHUB_TOKEN: ${GITHUB_TOKEN:+set}"
+    echo "ISSUE_REPO: ${ISSUE_REPO:-not set}"
+    echo "ISSUE_NUMBER: ${ISSUE_NUMBER:-not set}"
+    exit 1
   fi
 fi
 
