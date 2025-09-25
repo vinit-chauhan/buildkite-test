@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${INTEGRATION:?}"  # from matrix
+# Get integration from Buildkite matrix
+echo "--- Debug: Buildkite environment variables"
+echo "BUILDKITE_MATRIX_SETUP_INTEGRATION: ${BUILDKITE_MATRIX_SETUP_INTEGRATION:-<not set>}"
+echo "Available BUILDKITE_MATRIX_* variables:"
+env | grep "^BUILDKITE_MATRIX" || echo "None found"
+
+INTEGRATION="${BUILDKITE_MATRIX_SETUP_INTEGRATION:?}"
+echo "Using integration: ${INTEGRATION}"
 : "${INTEGRATIONS_REPO:=vinit-chauhan/integrations}"
 : "${INTEGRATIONS_BRANCH:=main}"
 : "${INTEGRATION_PATH_PREFIX:=packages}"
 : "${GITHUB_TOKEN:?}"  # Required for PR creation
 
+echo "Processing integration: ${INTEGRATION}"
 WORK="work/${INTEGRATION}"
 mkdir -p "$WORK"
 pushd "$WORK" >/dev/null

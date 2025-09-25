@@ -143,6 +143,10 @@ if [[ -z "$INTEGS" || "$INTEGS" == "[]" ]]; then
   exit 0
 fi
 
+echo "Debug: Found integrations JSON: $INTEGS"
+echo "Debug: Individual integrations:"
+jq -r '.[]' <<<"$INTEGS"
+
 # Export useful vars to downstream steps (summary will use them)
 {
   echo "ISSUE_NUMBER=${ISSUE_NUMBER}"
@@ -151,6 +155,9 @@ fi
 } >> "$BUILDKITE_ENV_FILE"
 
 # Upload dynamic pipeline: one job per integration
+# Convert JSON array to YAML array for Buildkite matrix
+INTEGS_YAML=$(echo "$INTEGS" | jq -r 'map("        - " + .) | join("\n")')
+
 cat > work/dynamic.yml <<YAML
 steps:
   - label: ":package: elastic-package check %{matrix.integration}"
@@ -163,7 +170,8 @@ steps:
       BUILDKITE_BUILD_URL: ${BUILDKITE_BUILD_URL:-}
     matrix:
       setup:
-        integration: ${INTEGS}
+        integration:
+${INTEGS_YAML}
 
   - label: ":memo: summarize"
     key: summarize
@@ -175,6 +183,9 @@ steps:
       ISSUE_NUMBER: ${ISSUE_NUMBER:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
 YAML
+
+echo "Debug: Generated pipeline:"
+cat work/dynamic.yml
 
 buildkite-agent pipeline upload work/dynamic.yml
 
