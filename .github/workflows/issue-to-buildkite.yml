@@ -32,15 +32,18 @@ jobs:
             echo "Found YAML front-matter:"
             cat extracted.yaml
             
-            # Parse integrations using yq
+            # Parse integrations using yq and ensure compact JSON
             if command -v yq >/dev/null 2>&1; then
-              INTEGRATIONS=$(yq -o=json '.integrations // []' extracted.yaml)
+              INTEGRATIONS=$(yq -o=json -I=0 '.integrations // []' extracted.yaml)
             else
               # Install yq
               sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
               sudo chmod +x /usr/local/bin/yq
-              INTEGRATIONS=$(yq -o=json '.integrations // []' extracted.yaml)
+              INTEGRATIONS=$(yq -o=json -I=0 '.integrations // []' extracted.yaml)
             fi
+            
+            # Ensure it's truly compact (remove any remaining whitespace)
+            INTEGRATIONS=$(echo "$INTEGRATIONS" | jq -c '.')
             
             echo "Parsed integrations: $INTEGRATIONS"
             
@@ -60,18 +63,30 @@ jobs:
       - name: Trigger Buildkite Pipeline
         if: steps.extract-yaml.outputs.has-integrations == 'true'
         run: |
+          # Use jq to construct the payload properly
+          jq -n \
+            --arg integrations_json '${{ steps.extract-yaml.outputs.integrations-json }}' \
+            --arg issue_number '${{ github.event.issue.number }}' \
+            --arg issue_url '${{ github.event.issue.html_url }}' \
+            --arg issue_repo '${{ github.repository }}' \
+            --arg github_token '${{ secrets.GITHUB_TOKEN }}' \
+            '{
+              "commit": "HEAD",
+              "branch": "main",
+              "message": ("Check integrations from issue #" + $issue_number),
+              "env": {
+                "ISSUE_NUMBER": $issue_number,
+                "ISSUE_URL": $issue_url,
+                "ISSUE_REPO": $issue_repo,
+                "INTEGRATIONS_JSON": $integrations_json,
+                "GITHUB_TOKEN": $github_token
+              }
+            }' > payload.json
+          
+          echo "Payload being sent:"
+          cat payload.json
+          
           curl -X POST "https://api.buildkite.com/v2/organizations/${{ vars.BUILDKITE_ORG }}/pipelines/${{ vars.BUILDKITE_PIPELINE }}/builds" \
             -H "Authorization: Bearer ${{ secrets.BUILDKITE_API_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "commit": "HEAD",
-              "branch": "main",
-              "message": "Check integrations from issue #${{ github.event.issue.number }}",
-              "env": {
-                "ISSUE_NUMBER": "${{ github.event.issue.number }}",
-                "ISSUE_URL": "${{ github.event.issue.html_url }}",
-                "ISSUE_REPO": "${{ github.repository }}",
-                "INTEGRATIONS_JSON": ${{ toJson(steps.extract-yaml.outputs.integrations-json) }},
-                "GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
-              }
-            }'
+            -d @payload.json
