@@ -9,7 +9,7 @@ set -euo pipefail
 # Get the integration name from matrix
 INTEGRATION=${INTEGRATION:?}
 REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
-GITHUB_PR_TOKEN=$(buildkite-agent secret get GITHUB_PR_TOKEN)  # Token with repo permissions
+GITHUB_TOKEN=$(buildkite-agent secret get GITHUB_PR_TOKEN)  # Token with repo permissions
 
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 echo "Checking integration: ${INTEGRATION}"
@@ -84,7 +84,7 @@ setup_github_cli() {
     
     # Authenticate GitHub CLI
     echo "Authenticating GitHub CLI..."
-    if echo "${GITHUB_PR_TOKEN}" | gh auth login --with-token; then
+    if echo "${GITHUB_TOKEN}" | gh auth login --with-token; then
         add_check_result "gh_auth" "passed" "Successfully authenticated GitHub CLI"
         echo "✅ GitHub CLI authenticated successfully"
         return 0
@@ -372,12 +372,6 @@ if [[ "${CHECK_STATUS}" == "failed" ]]; then
     
     cd elastic-integrations
     
-    # Set up GitHub authentication for pushing
-    git remote set-url origin "https://x-access-token:${GITHUB_PR_TOKEN}@github.com/${REPOSITORY_NAME}.git"
-    
-    # Authenticate GitHub CLI
-    echo "${GITHUB_PR_TOKEN}" | gh auth login --with-token
-    
     # Create a new branch for this fix
     BRANCH_NAME="fix-${INTEGRATION}-issue-${ISSUE_NUMBER:-$(date +%s)}"
     git checkout -b "${BRANCH_NAME}"
@@ -426,11 +420,7 @@ else
     git config --global user.email "buildkite-bot@example.com"  
     git config --global user.name "Buildkite Bot"
     
-    cd elastic-integrations
-    
-    # Set up GitHub authentication for pushing
-    git remote set-url origin "https://x-access-token:${GITHUB_PR_TOKEN}@github.com/${REPOSITORY_NAME}.git"
-    
+    cd elastic-integrations 
     # Install and authenticate GitHub CLI
     if ! setup_github_cli; then
         echo "⚠️ Could not set up GitHub CLI for enhancement PR"
