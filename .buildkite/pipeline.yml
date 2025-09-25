@@ -1,7 +1,7 @@
 steps:
-  - label: ":shield: gate + fan-out from GitHub issues"
+  - label: ":shield: run elastic-package check"
     key: gate
-    command: .buildkite/scripts/gate_and_fanout.sh
+    command: .buildkite/scripts/run_check.sh
     agents: { queue: default }
 
   # The matrix and summary steps will be uploaded dynamically by the script above.
