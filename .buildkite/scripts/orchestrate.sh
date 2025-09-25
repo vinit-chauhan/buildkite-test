@@ -72,7 +72,7 @@ INTEGRATIONS_ARRAY=$(echo "${INTEGRATIONS_JSON}" | jq -r '.[]')
 
 cat > dynamic-pipeline.yml << 'EOF'
 steps:
-  - label: ":package: Check %{matrix.integration}"
+  - label: ":package: Check {{matrix.integration}}"
     key: "check"
     command: ".buildkite/scripts/check_integration.sh"
     matrix:
@@ -86,7 +86,7 @@ echo "${INTEGRATIONS_ARRAY}" | while IFS= read -r integration; do
 done
 
 cat >> dynamic-pipeline.yml << EOF
-    artifact_paths: "results/*.json"
+    artifact_paths: "results/{{matrix.integration}}.json"
     agents:
       queue: "default"
     env:
@@ -94,6 +94,7 @@ cat >> dynamic-pipeline.yml << EOF
       ISSUE_URL: "${ISSUE_URL}"
       ISSUE_REPO: "${ISSUE_REPO}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
+      INTEGRATION: "{{matrix.integration}}"
 
   - label: ":memo: Summarize Results"
     key: "summarize"
@@ -127,6 +128,7 @@ fi
 
 echo ""
 echo "Uploading dynamic pipeline..."
+buildkite-agent env set INTEGRATIONS_JSON "${INTEGRATIONS_JSON}"
 buildkite-agent pipeline upload dynamic-pipeline.yml
 
 echo "✅ Pipeline uploaded successfully"

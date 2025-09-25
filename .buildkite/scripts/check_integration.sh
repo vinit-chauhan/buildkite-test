@@ -9,7 +9,8 @@ echo "Build: ${BUILDKITE_BUILD_NUMBER:-unknown}"
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 
 # Get the integration name from matrix
-INTEGRATION="cisco_duo"
+INTEGRATION=${INTEGRATION:?}
+BUILDKITE_MATRIX_INTEGRATION=${INTEGRATION:-}
 
 # Debug: Show all available environment variables
 echo "Matrix-related environment variables:"
