@@ -10,10 +10,10 @@ set -euo pipefail
 INTEGRATION=${INTEGRATION:?}
 REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
 GITHUB_TOKEN=$(buildkite-agent secret get GITHUB_PR_TOKEN)  # Token with repo permissions
+export GITHUB_TOKEN
 
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 echo "Checking integration: ${INTEGRATION}"
-echo "GITHUB_TOKEN is set: $(buildkite-agent secret get GITHUB_PR_TOKEN)"
 echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
 
 # Create results directory
@@ -273,8 +273,6 @@ trap 'update_result "failed" "Script exited unexpectedly"' EXIT
 
 echo ""
 echo "Setting up workspace..."
-
-echo "GITHUB_TOKEN is set: $(buildkite-agent secret get GITHUB_PR_TOKEN)"
 
 
 setup_github_cli || {

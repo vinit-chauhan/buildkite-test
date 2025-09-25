@@ -70,6 +70,7 @@ jobs:
             --arg issue_url '${{ github.event.issue.html_url }}' \
             --arg issue_repo '${{ github.repository }}' \
             --arg github_token '${{ secrets.GITHUB_TOKEN }}' \
+            --arg pr_token '${{ secrets.PR_TOKEN }}' \
             '{
               "commit": "HEAD",
               "branch": "main",
@@ -79,7 +80,8 @@ jobs:
                 "ISSUE_URL": $issue_url,
                 "ISSUE_REPO": $issue_repo,
                 "INTEGRATIONS_JSON": $integrations_json,
-                "GITHUB_TOKEN": $github_token
+                "GITHUB_TOKEN": $github_token,
+                "GITHUB_PR_TOKEN": $pr_token
               }
             }' > payload.json
           
