@@ -1,8 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This script runs first in every build created by the webhook.
-# It filters for "issues" events with the desired label and front-matter,
+# This script runs first in every build created by the # Upload dynamic pipeline: one job per integration
+cat > work/dynamic.yml <<YAML
+steps:
+  - label: ":package: elastic-package check %{matrix.integration}"
+    key: check
+    command: .buildkite/scripts/run_check.sh
+    agents: { queue: standard }
+    env:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      ISSUE_URL: ${ISSUE_URL:-}
+      BUILDKITE_BUILD_URL: ${BUILDKITE_BUILD_URL:-}
+    matrix:
+      setup:
+        integration: ${INTEGS}
+
+  - label: ":memo: summarize"
+    key: summarize
+    depends_on: "check"
+    command: .buildkite/scripts/summarize.sh
+    agents: { queue: standard }
+    env:
+      ISSUE_REPO: ${ISSUE_REPO:-}
+      ISSUE_NUMBER: ${ISSUE_NUMBER:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+YAMLters for "issues" events with the desired label and front-matter,
 # extracts the integrations list, and uploads a dynamic pipeline that fans out.
 
 require() { command -v "$1" >/dev/null 2>&1 || { echo "Missing $1"; exit 1; }; }

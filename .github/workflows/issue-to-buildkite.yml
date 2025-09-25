@@ -34,6 +34,7 @@ jobs:
             --arg issueurl "${{ github.event.issue.html_url }}" \
             --arg issueyaml "${{ steps.parse.outputs.frontmatter }}" \
             --arg repo "${{ github.repository }}" \
+            --arg githubtoken "${{ secrets.GITHUB_TOKEN }}" \
             '{
               message: $msg,
               branch: $branch,
@@ -43,7 +44,8 @@ jobs:
                 ISSUE_URL: $issueurl,
                 ISSUE_YAML: $issueyaml,
                 ISSUE_REPO: $repo,
-                ISSUE_EVENT: "opened_or_labeled"
+                ISSUE_EVENT: "opened_or_labeled",
+                GITHUB_TOKEN: $githubtoken
               }
             }' > build.json
 
