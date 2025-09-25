@@ -13,6 +13,7 @@ GITHUB_TOKEN=$(buildkite-agent secret get GITHUB_PR_TOKEN)  # Token with repo pe
 
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 echo "Checking integration: ${INTEGRATION}"
+echo "GITHUB_TOKEN is set: $(buildkite-agent secret get GITHUB_PR_TOKEN)"
 echo "Issue: #${ISSUE_NUMBER:-unknown} from ${ISSUE_REPO:-unknown}"
 
 # Create results directory
