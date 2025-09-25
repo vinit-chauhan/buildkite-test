@@ -181,7 +181,7 @@ steps:
   - label: ":package: elastic-package check %{matrix.integration}"
     key: check
     command: .buildkite/scripts/run_check.sh
-    agents: { queue: standard }
+    agents: { queue: default }
     env:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       ISSUE_URL: ${ISSUE_URL:-}
@@ -195,7 +195,7 @@ ${INTEGS_YAML}
     key: summarize
     depends_on: "check"
     command: .buildkite/scripts/summarize.sh
-    agents: { queue: standard }
+    agents: { queue: default }
     env:
       ISSUE_REPO: ${ISSUE_REPO:-}
       ISSUE_NUMBER: ${ISSUE_NUMBER:-}
