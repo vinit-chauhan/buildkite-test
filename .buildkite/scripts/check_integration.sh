@@ -341,10 +341,10 @@ if [[ "${CHECK_STATUS}" == "failed" ]]; then
     cd elastic-integrations
     
     # Set up GitHub authentication for pushing
-    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
+    git remote set-url origin "https://x-access-token:${GITHUB_PR_TOKEN}@github.com/${REPOSITORY_NAME}.git"
     
     # Authenticate GitHub CLI
-    echo "${GITHUB_TOKEN}" | gh auth login --with-token
+    echo "${GITHUB_PR_TOKEN}" | gh auth login --with-token
     
     # Create a new branch for this fix
     BRANCH_NAME="fix-${INTEGRATION}-issue-${ISSUE_NUMBER:-$(date +%s)}"
