@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Create results directory
+mkdir -p results
+
+# Initialize result file with absolute path
+RESULT_FILE="$(pwd)/results/${INTEGRATION}.json"
 set -euo pipefail
 
 # Script to check a single integration using elastic-package
@@ -37,11 +42,13 @@ update_result() {
     local message="$2"
     local end_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     
+    # Create temp file in /tmp to avoid path issues
+    local temp_file="/tmp/result_update_$$.json"
     jq --arg status "$status" \
        --arg message "$message" \
        --arg end_time "$end_time" \
        '.status = $status | .message = $message | .end_time = $end_time' \
-       "${RESULT_FILE}" > "${RESULT_FILE}.tmp" && mv "${RESULT_FILE}.tmp" "${RESULT_FILE}"
+       "${RESULT_FILE}" > "${temp_file}" && mv "${temp_file}" "${RESULT_FILE}"
 }
 
 # Function to add check result
@@ -50,11 +57,13 @@ add_check_result() {
     local check_status="$2" 
     local check_message="$3"
     
+    # Create temp file in /tmp to avoid path issues
+    local temp_file="/tmp/check_result_$$.json"
     jq --arg name "$check_name" \
        --arg status "$check_status" \
        --arg message "$check_message" \
        '.checks += [{"name": $name, "status": $status, "message": $message}]' \
-       "${RESULT_FILE}" > "${RESULT_FILE}.tmp" && mv "${RESULT_FILE}.tmp" "${RESULT_FILE}"
+       "${RESULT_FILE}" > "${temp_file}" && mv "${temp_file}" "${RESULT_FILE}"
 }
 
 # Trap to ensure we always update the result on exit
@@ -270,7 +279,7 @@ echo "=== Integration Check Complete ==="
 echo "Status: $(jq -r '.status' "${RESULT_FILE}")"
 echo "Result file: ${RESULT_FILE}"
 
-# Upload the result as an artifact
-buildkite-agent artifact upload "${RESULT_FILE}"
+# Upload the result as an artifact (use relative path for consistency)
+buildkite-agent artifact upload "results/${INTEGRATION}.json"
 
 echo "✅ Result uploaded as artifact"
