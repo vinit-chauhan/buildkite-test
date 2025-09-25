@@ -153,15 +153,14 @@ create_integration_pr() {
     fi
     
     # Create commit message
-    COMMIT_MSG="feat: Update ${INTEGRATION} integration
+    COMMIT_MSG="feat: Update ${INTEGRATION} integration \
+    - Added changelog entry for automated improvements \
+    - Rebuilt package with elastic-package build \
+    - ${reason} \
 
-- Added changelog entry for automated improvements
-- Rebuilt package with elastic-package build
-- ${reason}
-
-Related to: ${ISSUE_URL:-}
-Build: ${BUILDKITE_BUILD_URL:-}
-Integration: ${INTEGRATION}"
+    Related to: ${ISSUE_URL:-} \
+    Build: ${BUILDKITE_BUILD_URL:-} \
+    Integration: ${INTEGRATION}"
     
     echo "Committing changes..."
     if git commit -m "$COMMIT_MSG"; then
@@ -208,38 +207,37 @@ Integration: ${INTEGRATION}"
     echo "Creating GitHub PR..."
     PR_TITLE="feat: Update ${INTEGRATION} integration"
     PR_BODY="## 🔧 Automated Integration Update
+        This PR contains automated improvements for the \`${INTEGRATION}\` integration.
 
-This PR contains automated improvements for the \`${INTEGRATION}\` integration.
+        ### Changes Made
+        - ✅ Added changelog entry for tracking improvements
+        - ✅ Rebuilt package using \`elastic-package build\`
+        - 🔍 Addressed issues found during integration check
 
-### Changes Made
-- ✅ Added changelog entry for tracking improvements
-- ✅ Rebuilt package using \`elastic-package build\`
-- 🔍 Addressed issues found during integration check
+        ### Context
+        - **Integration:** \`${INTEGRATION}\`
+        - **Issue:** ${ISSUE_URL:-N/A}
+        - **Build:** ${BUILDKITE_BUILD_URL:-N/A}
+        - **Branch:** \`${branch_name}\`
+        - **Reason:** ${reason}
 
-### Context
-- **Integration:** \`${INTEGRATION}\`
-- **Issue:** ${ISSUE_URL:-N/A}
-- **Build:** ${BUILDKITE_BUILD_URL:-N/A}
-- **Branch:** \`${branch_name}\`
-- **Reason:** ${reason}
+        ### Build Output
+        <details>
+        <summary>elastic-package build output</summary>
 
-### Build Output
-<details>
-<summary>elastic-package build output</summary>
+        \`\`\`
+        ${BUILD_DETAILS}
+        \`\`\`
+        </details>
 
-\`\`\`
-${BUILD_DETAILS}
-\`\`\`
-</details>
+        ### Review Notes
+        - Package build completed successfully
+        - All changes have been automatically generated
+        - Please review the changelog entry and build artifacts
+        - Consider running additional tests before merging
 
-### Review Notes
-- Package build completed successfully
-- All changes have been automatically generated
-- Please review the changelog entry and build artifacts
-- Consider running additional tests before merging
-
----
-*This PR was automatically created by the Buildkite integration pipeline.*"
+        ---
+        *This PR was automatically created by the Buildkite integration pipeline.*"
 
     if gh pr create \
         --title "$PR_TITLE" \
@@ -274,6 +272,11 @@ trap 'update_result "failed" "Script exited unexpectedly"' EXIT
 
 echo ""
 echo "Setting up workspace..."
+
+setup_github_cli || {
+    update_result "failed" "Failed to set up GitHub CLI"
+    exit 1
+}
 
 # Clone repository
 if [[ ! -d "elastic-integrations" ]]; then
@@ -397,17 +400,7 @@ Build: ${BUILDKITE_BUILD_URL:-}"
                 # Create simple PR
                 if gh pr create \
                     --title "docs: Troubleshooting info for ${INTEGRATION}" \
-                    --body "This PR documents issues found during elastic-package check for the ${INTEGRATION} integration.
-
-Related to: ${ISSUE_URL:-}
-Build: ${BUILDKITE_BUILD_URL:-}
-
-## Issue Details
-\`\`\`
-${CHECK_DETAILS}
-\`\`\`
-
-This requires manual investigation and fixes." \
+                    --body "This PR documents issues found during elastic-package check for the ${INTEGRATION} integration." \
                     --head "${BRANCH_NAME}" \
                     --base "main"; then
                     
@@ -466,10 +459,7 @@ fi
         echo "No changes to commit"
         add_check_result "pr_creation" "skipped" "No changes to commit"
     else
-        git commit -m "Fix: Address elastic-package check failures for ${INTEGRATION}
-
-Related to issue: ${ISSUE_URL:-}
-Build: ${BUILDKITE_BUILD_URL:-}"
+        git commit -m "Fix: Address elastic-package check failures for ${INTEGRATION}; Related to issue: ${ISSUE_URL:-}; Build: ${BUILDKITE_BUILD_URL:-}"
 
         # Push branch
         if git push origin "${BRANCH_NAME}"; then
@@ -478,7 +468,7 @@ Build: ${BUILDKITE_BUILD_URL:-}"
             if command -v gh >/dev/null 2>&1; then
                 if gh pr create \
                     --title "Fix: elastic-package check failures for ${INTEGRATION}" \
-                    --body "This PR addresses check failures found by elastic-package for the ${INTEGRATION} integration.\
+                    --body "This PR addresses check failures found by elastic-package for the ${INTEGRATION} integration." \
                     --head "${BRANCH_NAME}" \
                     --base "main"; then
                     
