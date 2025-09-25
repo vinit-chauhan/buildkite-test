@@ -9,6 +9,7 @@ set -euo pipefail
 # Get the integration name from matrix
 INTEGRATION=${INTEGRATION:?}
 REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
+GITHUB_PR_TOKEN=${GITHUB_PR_TOKEN:?}  # Token with repo permissions
 
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 echo "Checking integration: ${INTEGRATION}"
