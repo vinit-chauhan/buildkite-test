@@ -147,12 +147,30 @@ Integration: ${INTEGRATION}"
     
     # Push the branch
     echo "Pushing branch: ${branch_name}"
-    if git push origin "${branch_name}"; then
+    PUSH_OUTPUT=$(mktemp)
+    if git push origin "${branch_name}" 2>&1 | tee "${PUSH_OUTPUT}"; then
         add_check_result "git_push" "passed" "Successfully pushed branch"
         echo "✅ Branch pushed successfully"
     else
-        add_check_result "git_push" "failed" "Failed to push branch"
+        PUSH_ERROR=$(cat "${PUSH_OUTPUT}")
+        add_check_result "git_push" "failed" "Failed to push branch: ${PUSH_ERROR}"
         echo "❌ Failed to push branch"
+        echo "Error details: ${PUSH_ERROR}"
+        
+        # Check for common permission issues
+        if [[ "${PUSH_ERROR}" =~ "access_denied_to_user" ]] || [[ "${PUSH_ERROR}" =~ "403" ]]; then
+            echo "🚨 Permission denied error detected!"
+            echo "   This usually means:"
+            echo "   1. The GitHub token doesn't have write access to ${REPOSITORY_NAME}"
+            echo "   2. The repository ${REPOSITORY_NAME} doesn't exist or isn't accessible"
+            echo "   3. The token doesn't have the required 'repo' scope"
+            echo ""
+            echo "   Please check:"
+            echo "   - Your GitHub token has 'repo' scope permissions"
+            echo "   - You have write access to the repository: ${REPOSITORY_NAME}"
+            echo "   - The repository exists and is accessible"
+        fi
+        
         cd - >/dev/null
         return 1
     fi
@@ -316,11 +334,17 @@ if [[ "${CHECK_STATUS}" == "failed" ]]; then
     echo ""
     echo "Check failed - attempting to create PR with changelog and build..."
     
-    # Set up git configuration
+    # Set up git configuration and authentication
     git config --global user.email "buildkite-bot@example.com"
     git config --global user.name "Buildkite Bot"
     
     cd elastic-integrations
+    
+    # Set up GitHub authentication for pushing
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
+    
+    # Authenticate GitHub CLI
+    echo "${GITHUB_TOKEN}" | gh auth login --with-token
     
     # Create a new branch for this fix
     BRANCH_NAME="fix-${INTEGRATION}-issue-${ISSUE_NUMBER:-$(date +%s)}"
@@ -331,17 +355,6 @@ if [[ "${CHECK_STATUS}" == "failed" ]]; then
         echo "✅ Successfully created PR with changelog and build"
     else
         echo "⚠️ PR creation with build failed, falling back to basic fix..."
-        
-        # Fallback: create a simple documentation fix
-        echo "# Fixes for ${INTEGRATION}" > "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        echo "" >> "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        echo "This integration failed checks and needs manual review." >> "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        echo "Check output:" >> "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        echo '```' >> "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        echo "${CHECK_DETAILS}" >> "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        echo '```' >> "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-        
-        git add "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
         
         if ! git diff --staged --quiet; then
             git commit -m "docs: Add troubleshooting information for ${INTEGRATION}
@@ -392,6 +405,12 @@ else
     git config --global user.name "Buildkite Bot"
     
     cd elastic-integrations
+    
+    # Set up GitHub authentication for pushing
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
+    
+    # Authenticate GitHub CLI
+    echo "${GITHUB_TOKEN}" | gh auth login --with-token
     
     # Create enhancement branch
     BRANCH_NAME="enhance-${INTEGRATION}-issue-${ISSUE_NUMBER:-$(date +%s)}"
