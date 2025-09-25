@@ -58,62 +58,60 @@ BODY_FILE="work/webhook.json"
 if [[ -z "${BUILDKITE_WEBHOOK_BODY:-}" ]]; then
   echo "No BUILDKITE_WEBHOOK_BODY – checking if triggered from GitHub Actions..." >&2
   
-  # Check if we have the data from GitHub Actions environment
+  # Check if we have the data from GitHub Actions environment (passed via Buildkite API)
   if [[ -n "${ISSUE_NUMBER:-}" && -n "${ISSUE_YAML:-}" ]]; then
-    echo "Found GitHub Actions environment variables, creating webhook body structure" >&2
-    # Create a structure that mimics what we'd get from a webhook
-    cat > "$BODY_FILE" <<EOF
-{
-  "action": "${ISSUE_EVENT:-opened}",
-  "issue": {
-    "number": ${ISSUE_NUMBER},
-    "html_url": "${ISSUE_URL:-}",
-    "body": $(printf '%s' "${ISSUE_YAML}" | jq -Rs .),
-    "labels": [{"name": "ai-doc-gen"}]
-  },
-  "repository": {
-    "full_name": "${ISSUE_REPO:-}"
-  }
-}
-EOF
+    echo "Found GitHub Actions environment variables, using them directly" >&2
+    
+    ISSUE_BODY="${ISSUE_YAML}"
+    # We already have the variables we need, skip webhook parsing
+    
   else
     echo "No webhook body and no GitHub Actions env vars found" >&2
-    echo "Expected: BUILDKITE_WEBHOOK_BODY or (ISSUE_NUMBER, ISSUE_YAML, etc.)" >&2
+    echo "Available environment variables:"
+    env | grep -E "^(ISSUE_|BUILDKITE_|GITHUB_)" || echo "None found"
     exit 1
   fi
 else
   printf "%s" "$BUILDKITE_WEBHOOK_BODY" > "$BODY_FILE"
+  
+  EVENT=$(jq -r '.action // empty' "$BODY_FILE")
+  KIND=$(jq -r 'if has("issue") then "issues" elif has("pull_request") then "pull_request" else "unknown" end' "$BODY_FILE")
+
+  if [[ "$KIND" != "issues" ]]; then
+    echo "Ignoring non-issues event: $KIND"
+    exit 0
+  fi
+
+  # Accept opened/labeled/edited/reopened
+  case "$EVENT" in
+    opened|labeled|edited|reopened) : ;;
+    *) echo "Ignoring issues.$EVENT"; exit 0 ;;
+  esac
+
+  # Filter on label (ai-doc-gen) — change/remove if you want any issue to trigger.
+  LABEL_MATCH=$(jq -r '.issue.labels[].name? // empty' "$BODY_FILE" | grep -x "ai-doc-gen" || true)
+  if [[ -z "$LABEL_MATCH" ]]; then
+    echo "No ai-doc-gen label, exiting."
+    exit 0
+  fi
+
+  ISSUE_NUMBER=$(jq -r '.issue.number' "$BODY_FILE")
+  ISSUE_URL=$(jq -r '.issue.html_url' "$BODY_FILE")
+  ISSUE_REPO=$(jq -r '.repository.full_name' "$BODY_FILE")
+  ISSUE_BODY=$(jq -r '.issue.body // ""' "$BODY_FILE")
 fi
-
-EVENT=$(jq -r '.action // empty' "$BODY_FILE")
-KIND=$(jq -r 'if has("issue") then "issues" elif has("pull_request") then "pull_request" else "unknown" end' "$BODY_FILE")
-
-if [[ "$KIND" != "issues" ]]; then
-  echo "Ignoring non-issues event: $KIND"
-  exit 0
-fi
-
-# Accept opened/labeled/edited/reopened
-case "$EVENT" in
-  opened|labeled|edited|reopened) : ;;
-  *) echo "Ignoring issues.$EVENT"; exit 0 ;;
-esac
-
-# Filter on label (ai-doc-gen) — change/remove if you want any issue to trigger.
-LABEL_MATCH=$(jq -r '.issue.labels[].name? // empty' "$BODY_FILE" | grep -x "ai-doc-gen" || true)
-if [[ -z "$LABEL_MATCH" ]]; then
-  echo "No ai-doc-gen label, exiting."
-  exit 0
-fi
-
-ISSUE_NUMBER=$(jq -r '.issue.number' "$BODY_FILE")
-ISSUE_URL=$(jq -r '.issue.html_url' "$BODY_FILE")
-ISSUE_REPO=$(jq -r '.repository.full_name' "$BODY_FILE")
-ISSUE_BODY=$(jq -r '.issue.body // ""' "$BODY_FILE")
 
 # Extract front-matter YAML between --- markers
-echo "$ISSUE_BODY" > work/issue_body.txt
-awk 'BEGIN{f=0} /^---[ \t]*$/{c++} c==1{f=1;next} c==2{exit} f{print}' work/issue_body.txt > work/issue.yaml || true
+if [[ -n "${ISSUE_YAML:-}" ]]; then
+  # We already have the YAML from GitHub Actions
+  echo "Using YAML from GitHub Actions environment"
+  echo "$ISSUE_YAML" > work/issue.yaml
+else
+  # Extract from issue body
+  echo "Extracting YAML from issue body"
+  echo "$ISSUE_BODY" > work/issue_body.txt
+  awk 'BEGIN{f=0} /^---[ \t]*$/{c++} c==1{f=1;next} c==2{exit} f{print}' work/issue_body.txt > work/issue.yaml || true
+fi
 
 if [[ ! -s work/issue.yaml ]]; then
   echo "No YAML front-matter found in issue body; exiting."
