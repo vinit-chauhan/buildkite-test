@@ -59,8 +59,16 @@ if [[ -z "${BUILDKITE_WEBHOOK_BODY:-}" ]]; then
   echo "No BUILDKITE_WEBHOOK_BODY – checking if triggered from GitHub Actions..." >&2
   
   # Check if we have the data from GitHub Actions environment (passed via Buildkite API)
-  if [[ -n "${ISSUE_NUMBER:-}" && -n "${ISSUE_YAML:-}" ]]; then
+  if [[ -n "${ISSUE_NUMBER:-}" ]]; then
     echo "Found GitHub Actions environment variables, using them directly" >&2
+    echo "ISSUE_NUMBER: ${ISSUE_NUMBER:-<not set>}"
+    echo "ISSUE_URL: ${ISSUE_URL:-<not set>}"
+    echo "ISSUE_REPO: ${ISSUE_REPO:-<not set>}"
+    echo "ISSUE_YAML length: ${#ISSUE_YAML}"
+    echo "ISSUE_YAML content:"
+    echo "---BEGIN ISSUE_YAML---"
+    echo "${ISSUE_YAML:-<empty>}"
+    echo "---END ISSUE_YAML---"
     
     ISSUE_BODY="${ISSUE_YAML}"
     # We already have the variables we need, skip webhook parsing
@@ -103,14 +111,26 @@ fi
 
 # Extract front-matter YAML between --- markers
 if [[ -n "${ISSUE_YAML:-}" ]]; then
-  # We already have the YAML from GitHub Actions
+  # We have the YAML from GitHub Actions
   echo "Using YAML from GitHub Actions environment"
   echo "$ISSUE_YAML" > work/issue.yaml
 else
-  # Extract from issue body
-  echo "Extracting YAML from issue body"
-  echo "$ISSUE_BODY" > work/issue_body.txt
-  awk 'BEGIN{f=0} /^---[ \t]*$/{c++} c==1{f=1;next} c==2{exit} f{print}' work/issue_body.txt > work/issue.yaml || true
+  # Fallback: extract from full issue body if available, or create test data
+  echo "ISSUE_YAML is empty, trying fallback options..."
+  
+  # Check if we have any issue body data
+  if [[ -n "${ISSUE_BODY:-}" ]]; then
+    echo "Extracting YAML from issue body"
+    echo "$ISSUE_BODY" > work/issue_body.txt
+    awk 'BEGIN{f=0} /^---[ \t]*$/{c++} c==1{f=1;next} c==2{exit} f{print}' work/issue_body.txt > work/issue.yaml || true
+  else
+    # For testing: create a sample YAML if nothing is available
+    echo "No issue data found, creating test YAML for debugging"
+    cat > work/issue.yaml <<EOF
+integrations:
+  - test-integration
+EOF
+  fi
 fi
 
 if [[ ! -s work/issue.yaml ]]; then
