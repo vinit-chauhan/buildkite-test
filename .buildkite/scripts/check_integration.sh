@@ -274,6 +274,9 @@ trap 'update_result "failed" "Script exited unexpectedly"' EXIT
 echo ""
 echo "Setting up workspace..."
 
+echo "GITHUB_TOKEN is set: $(buildkite-agent secret get GITHUB_PR_TOKEN)"
+
+
 setup_github_cli || {
     update_result "failed" "Failed to set up GitHub CLI"
     exit 1
