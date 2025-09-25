@@ -59,13 +59,18 @@ EOF
 echo ""
 echo "Generating dynamic pipeline..."
 
-# Create YAML for matrix setup
-MATRIX_YAML=""
-while IFS= read -r integration; do
-    MATRIX_YAML="${MATRIX_YAML}        - \"${integration}\"\n"
-done <<< "${INTEGRATIONS}"
+# Debug: Show the integrations we're working with
+echo "Debug: INTEGRATIONS_JSON content:"
+echo "${INTEGRATIONS_JSON}"
+echo "Debug: Parsing integrations:"
+echo "${INTEGRATIONS_JSON}" | jq -r '.[]' | while IFS= read -r integration; do
+    echo "  Integration: '${integration}'"
+done
 
-cat > dynamic-pipeline.yml << EOF
+# Create YAML for matrix setup - ensure proper formatting
+INTEGRATIONS_ARRAY=$(echo "${INTEGRATIONS_JSON}" | jq -r '.[]')
+
+cat > dynamic-pipeline.yml << 'EOF'
 steps:
   - label: ":package: Check %{matrix.integration}"
     key: "check"
@@ -73,7 +78,14 @@ steps:
     matrix:
       setup:
         integration:
-$(echo -e "${MATRIX_YAML}")
+EOF
+
+# Add each integration as a YAML array item
+echo "${INTEGRATIONS_ARRAY}" | while IFS= read -r integration; do
+    echo "          - \"${integration}\"" >> dynamic-pipeline.yml
+done
+
+cat >> dynamic-pipeline.yml << EOF
     artifact_paths: "results/*.json"
     agents:
       queue: "default"
@@ -97,6 +109,21 @@ EOF
 
 echo "Generated pipeline:"
 cat dynamic-pipeline.yml
+
+# Validate the YAML before uploading
+if command -v yq >/dev/null 2>&1; then
+    echo ""
+    echo "Validating generated YAML..."
+    if yq eval '.' dynamic-pipeline.yml >/dev/null 2>&1; then
+        echo "✅ YAML is valid"
+    else
+        echo "❌ Generated YAML is invalid:"
+        yq eval '.' dynamic-pipeline.yml 2>&1 || true
+        exit 1
+    fi
+else
+    echo "⚠️  yq not available, skipping YAML validation"
+fi
 
 echo ""
 echo "Uploading dynamic pipeline..."

@@ -11,11 +11,30 @@ echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 # Get the integration name from matrix
 INTEGRATION="${BUILDKITE_MATRIX_SETUP_INTEGRATION:-}"
 
+# Debug: Show all available environment variables
+echo "Matrix-related environment variables:"
+env | grep -i matrix | sort
+echo ""
+echo "All Buildkite environment variables:"
+env | grep '^BUILDKITE_' | sort
+
 if [[ -z "${INTEGRATION}" ]]; then
-    echo "❌ No integration specified in matrix"
-    echo "Available environment variables:"
-    env | grep -E '^BUILDKITE_MATRIX' | sort
-    exit 1
+    echo "❌ No integration specified in BUILDKITE_MATRIX_SETUP_INTEGRATION"
+    
+    # Try alternative matrix variable patterns
+    if [[ -n "${BUILDKITE_MATRIX_INTEGRATION:-}" ]]; then
+        INTEGRATION="${BUILDKITE_MATRIX_INTEGRATION}"
+        echo "✅ Found integration via BUILDKITE_MATRIX_INTEGRATION: ${INTEGRATION}"
+    elif [[ -n "${matrix_integration:-}" ]]; then
+        INTEGRATION="${matrix_integration}"
+        echo "✅ Found integration via matrix_integration: ${INTEGRATION}"
+    else
+        echo "❌ No matrix integration variable found"
+        echo "This suggests the job is not running as a matrix job"
+        echo ""
+        echo "Pipeline may have failed to upload correctly or matrix syntax is incorrect"
+        exit 1
+    fi
 fi
 
 echo "Checking integration: ${INTEGRATION}"
