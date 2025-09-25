@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${INTEGRATION:?}"  # from matrix
-: "${INTEGRATIONS_REPO:=elastic/integrations}"
+: "${INTEGRATIONS_REPO:=vinit-chauhan/integrations}"
 : "${INTEGRATIONS_BRANCH:=main}"
 : "${INTEGRATION_PATH_PREFIX:=packages}"
 : "${GITHUB_TOKEN:?}"  # Required for PR creation
