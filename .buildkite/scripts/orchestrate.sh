@@ -128,7 +128,6 @@ fi
 
 echo ""
 echo "Uploading dynamic pipeline..."
-buildkite-agent env set INTEGRATIONS_JSON "${INTEGRATIONS_JSON}"
 buildkite-agent pipeline upload dynamic-pipeline.yml
 
 echo "✅ Pipeline uploaded successfully"
