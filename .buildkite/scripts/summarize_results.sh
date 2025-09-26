@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 echo "=== Results Summary Script ==="
 echo "Build: ${BUILDKITE_BUILD_NUMBER:-unknown}"
@@ -51,12 +51,13 @@ for result_file in results/*.json; do
 
   echo "Processing: $result_file -> $INTEGRATION ($STATUS)"
 
-  RESULTS_JSON=$(jq -n --arg integration "$INTEGRATION" \
-                       --arg status "$STATUS" \
-                       --arg message "$MESSAGE" \
-                       --argjson result "$(cat "$result_file")" \
-                       --argjson existing "$RESULTS_JSON" \
-                       '$existing + [{"integration": $integration, "status": $status, "message": $message, "details": $result}]')
+  RESULTS_JSON=$(echo "$RESULTS_JSON" \
+    | jq --arg integration "$INTEGRATION" \
+         --arg status "$STATUS" \
+         --arg message "$MESSAGE" \
+         --argjson result "$(cat $result_file)" \
+         --slurpfile result "$result_file" \
+         '. += [{"integration": $integration, "status": $status, "message": $message, "details": $result}]')
 
   ((TOTAL_INTEGRATIONS++))
   if [[ "$STATUS" == "passed" ]]; then ((PASSED_COUNT++)); else ((FAILED_COUNT++)); fi
