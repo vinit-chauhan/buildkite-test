@@ -82,7 +82,7 @@ setup_github_cli() {
     add_check_result "gh_install" "passed" "GitHub CLI available"
   fi
 
-  echo "${GITHUB_TOKEN:?GITHUB_TOKEN required}" | gh auth login --with-token >/dev/null 2>&1 \
+  echo "${GITHUB_TOKEN:?GITHUB_TOKEN required}" | gh auth login --with-token >/dev/null \
     && add_check_result "gh_auth" "passed" "Authenticated GitHub CLI" \
     || { add_check_result "gh_auth" "failed" "GitHub CLI auth failed"; return 1; }
 
