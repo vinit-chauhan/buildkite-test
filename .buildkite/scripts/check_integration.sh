@@ -126,11 +126,13 @@ setup_elastic_package() {
         
         # Try to download and install elastic-package
         ELASTIC_PACKAGE_VERSION="0.115.0"  # Use a known stable version
-
+        
+        local arch="$(uname -m)"
         case "$arch" in
         x86_64|amd64)  arch="amd64" ;;
         aarch64|arm64) arch="arm64" ;;
         esac
+        
         DOWNLOAD_URL="https://github.com/elastic/elastic-package/releases/download/v${ELASTIC_PACKAGE_VERSION}/elastic-package_${ELASTIC_PACKAGE_VERSION}_linux_${arch}.tar.gz"
 
         mkdir -p ~/bin
