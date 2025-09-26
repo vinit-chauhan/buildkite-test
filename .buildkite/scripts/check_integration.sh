@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# Create results directory
-mkdir -p results
-
-# Initialize result file with absolute path
-RESULT_FILE="$(pwd)/results/${INTEGRATION}.json"
 set -euo pipefail
 
 # Get the integration name from matrix
 INTEGRATION=${INTEGRATION:?}
 REPOSITORY_NAME=${REPOSITORY_NAME:-vinit-chauhan/integrations}
-GITHUB_TOKEN=$(buildkite-agent secret get GITHUB_PR_TOKEN)  # Token with repo permissions
-export GITHUB_TOKEN
+
+# Initialize result file with absolute path
+RESULT_FILE="$(pwd)/results/${INTEGRATION}.json"
 
 echo "Job: ${BUILDKITE_JOB_ID:-unknown}"
 echo "Checking integration: ${INTEGRATION}"
@@ -85,13 +81,40 @@ setup_github_cli() {
     
     # Authenticate GitHub CLI
     echo "Authenticating GitHub CLI..."
-    if echo "${GITHUB_TOKEN}" | gh auth login --with-token; then
-        add_check_result "gh_auth" "passed" "Successfully authenticated GitHub CLI"
-        echo "✅ GitHub CLI authenticated successfully"
+    
+    # Check if already authenticated
+    if gh auth status >/dev/null 2>&1; then
+        add_check_result "gh_auth" "passed" "GitHub CLI already authenticated"
+        echo "✅ GitHub CLI already authenticated"
+    else
+        # Try token authentication
+        if echo "${GITHUB_TOKEN}" | gh auth login --with-token >/dev/null 2>&1; then
+            add_check_result "gh_auth" "passed" "Successfully authenticated GitHub CLI"
+            echo "✅ GitHub CLI authenticated successfully"
+        else
+            # Fallback: Check if GITHUB_TOKEN environment variable authentication works
+            if [[ -n "${GITHUB_TOKEN:-}" ]] && gh auth status >/dev/null 2>&1; then
+                add_check_result "gh_auth" "passed" "GitHub CLI using environment token"
+                echo "✅ GitHub CLI using environment token authentication"
+            else
+                add_check_result "gh_auth" "failed" "Failed to authenticate GitHub CLI"
+                echo "❌ Failed to authenticate GitHub CLI"
+                echo "Debug: GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
+                gh auth status 2>&1 || true
+                return 1
+            fi
+        fi
+    fi
+    
+    # Set default repository
+    echo "Setting default repository to ${REPOSITORY_NAME}..."
+    if gh repo set-default "${REPOSITORY_NAME}"; then
+        add_check_result "gh_repo_default" "passed" "Set default repository to ${REPOSITORY_NAME}"
+        echo "✅ Default repository set to ${REPOSITORY_NAME}"
         return 0
     else
-        add_check_result "gh_auth" "failed" "Failed to authenticate GitHub CLI"
-        echo "❌ Failed to authenticate GitHub CLI"
+        add_check_result "gh_repo_default" "failed" "Failed to set default repository"
+        echo "❌ Failed to set default repository"
         return 1
     fi
 }
@@ -103,6 +126,13 @@ create_integration_pr() {
     local reason="$3"
     
     echo "--- Running elastic-package changelog and build for ${INTEGRATION}"
+    
+    # Configure git user before any git operations
+    git config --global user.email "buildkite-bot@example.com"
+    git config --global user.name "Buildkite Bot"
+    
+    # Set up git remote with token auth
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
     
     cd "$integration_path"
     
@@ -274,16 +304,11 @@ trap 'update_result "failed" "Script exited unexpectedly"' EXIT
 echo ""
 echo "Setting up workspace..."
 
-
-setup_github_cli || {
-    update_result "failed" "Failed to set up GitHub CLI"
-    exit 1
-}
-
 # Clone repository
 if [[ ! -d "elastic-integrations" ]]; then
     echo "Cloning ${REPOSITORY_NAME} repository..."
-    git clone --depth 1 https://github.com/${REPOSITORY_NAME}.git elastic-integrations
+    echo "Debug: Using $(pwd)"
+    git clone --depth 1 https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git elastic-integrations
     add_check_result "repository_clone" "passed" "Successfully cloned ${REPOSITORY_NAME}"
 else
     echo "Repository already exists, pulling latest..."
@@ -331,7 +356,7 @@ else
 fi
 
 echo "✅ elastic-package is ready"
-elastic-package version
+echo "elastic-package version: $(elastic-package version)"
 
 echo ""
 echo "Running elastic-package check on ${INTEGRATION}..."
@@ -367,12 +392,12 @@ cd - >/dev/null
 if [[ "${CHECK_STATUS}" == "failed" ]]; then
     echo ""
     echo "Check failed - attempting to create PR with changelog and build..."
-    
-    # Set up git configuration and authentication
-    git config --global user.email "buildkite-bot@example.com"
-    git config --global user.name "Buildkite Bot"
-    
     cd elastic-integrations
+    
+    # Configure git user and remote before any git operations
+    git config --global user.email "vinit.chauhan@elastic.co"
+    git config --global user.name "vinit-chauhan"
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
     
     # Create a new branch for this fix
     BRANCH_NAME="fix-${INTEGRATION}-issue-${ISSUE_NUMBER:-$(date +%s)}"
@@ -418,11 +443,13 @@ Build: ${BUILDKITE_BUILD_URL:-}"
 else
     echo "✅ Integration check passed - creating enhancement PR with changelog and build"
     
-    # Even for passing checks, create a PR with changelog and build improvements
+    cd elastic-integrations
+    
+    # Configure git user and remote before any git operations
     git config --global user.email "buildkite-bot@example.com"  
     git config --global user.name "Buildkite Bot"
+    git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git"
     
-    cd elastic-integrations 
     # Install and authenticate GitHub CLI
     if ! setup_github_cli; then
         echo "⚠️ Could not set up GitHub CLI for enhancement PR"
@@ -444,48 +471,6 @@ else
     
     cd - >/dev/null
 fi
-    
-    git add "packages/${INTEGRATION}/BUILDKITE_FIXES.md"
-    
-    if git diff --staged --quiet; then
-        echo "No changes to commit"
-        add_check_result "pr_creation" "skipped" "No changes to commit"
-    else
-        git commit -m "Fix: Address elastic-package check failures for ${INTEGRATION}; Related to issue: ${ISSUE_URL:-}; Build: ${BUILDKITE_BUILD_URL:-}"
-
-        # Push branch
-        if git push origin "${BRANCH_NAME}"; then
-            
-            # Create PR using GitHub CLI
-            if command -v gh >/dev/null 2>&1; then
-                if gh pr create \
-                    --title "Fix: elastic-package check failures for ${INTEGRATION}" \
-                    --body "This PR addresses check failures found by elastic-package for the ${INTEGRATION} integration." \
-                    --head "${BRANCH_NAME}" \
-                    --base "main"; then
-                    
-                    PR_URL=$(gh pr view --json url --jq '.url')
-                    add_check_result "pr_creation" "passed" "Created PR: ${PR_URL}"
-                    
-                    # Update result with PR info
-                    local temp_file="/tmp/pr_result_$$.json"
-                    jq --arg pr_url "$PR_URL" \
-                       --arg branch "$BRANCH_NAME" \
-                       '.pr_url = $pr_url | .pr_branch = $branch' \
-                       "${RESULT_FILE}" > "${temp_file}" && mv "${temp_file}" "${RESULT_FILE}"
-                    
-                    echo "✅ Created PR: ${PR_URL}"
-                else
-                    add_check_result "pr_creation" "failed" "GitHub CLI failed to create PR"
-                fi
-            fi
-        else
-            add_check_result "pr_creation" "failed" "Failed to push branch to origin"
-        fi
-    fi
-    
-    cd - >/dev/null
-fi
 
 # Final result update
 if [[ "${CHECK_STATUS}" == "passed" ]]; then
@@ -503,6 +488,6 @@ echo "Status: $(jq -r '.status' "${RESULT_FILE}")"
 echo "Result file: ${RESULT_FILE}"
 
 # Upload the result as an artifact (use relative path for consistency)
-buildkite-agent artifact upload "results/${INTEGRATION}.json"
+buildkite-agent artifact upload "$(pwd)/results/${INTEGRATION}.json"
 
 echo "✅ Result uploaded as artifact"
