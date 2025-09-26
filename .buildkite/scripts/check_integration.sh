@@ -275,6 +275,3 @@ echo "=== Integration Check Complete ==="
 echo "Status: $(jq -r '.status' "${RESULT_FILE}")"
 echo "Result file: ${RESULT_FILE}"
 
-# Upload artifact (use absolute path rooted in checkout)
-buildkite-agent artifact upload "${RESULT_FILE}"
-echo "✅ Result uploaded as artifact"
