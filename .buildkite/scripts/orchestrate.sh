@@ -82,9 +82,6 @@ cat >> "${PIPELINE_FILE}" <<EOF
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
 EOF
 
-echo; echo "Generated dynamic pipeline YAML:"
-cat "${PIPELINE_FILE}"
-
 # ---- Optional: validate YAML if yq is present ----
 if command -v yq >/dev/null 2>&1; then
   echo; echo "Validating generated YAML..."

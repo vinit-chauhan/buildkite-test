@@ -55,7 +55,7 @@ for result_file in results/*.json; do
     | jq --arg integration "$INTEGRATION" \
          --arg status "$STATUS" \
          --arg message "$MESSAGE" \
-         --argjson result "$(cat "$result_file")" \
+         --argjson result "$(cat $result_file)" \
          '. += [{"integration": $integration, "status": $status, "message": $message, "details": $result}]')
 
   ((TOTAL_INTEGRATIONS++))
