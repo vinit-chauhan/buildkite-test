@@ -307,7 +307,6 @@ echo "Setting up workspace..."
 # Clone repository
 if [[ ! -d "elastic-integrations" ]]; then
     echo "Cloning ${REPOSITORY_NAME} repository..."
-    echo "Debug: Using $(pwd)"
     git clone --depth 1 https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY_NAME}.git elastic-integrations
     add_check_result "repository_clone" "passed" "Successfully cloned ${REPOSITORY_NAME}"
 else
@@ -488,6 +487,6 @@ echo "Status: $(jq -r '.status' "${RESULT_FILE}")"
 echo "Result file: ${RESULT_FILE}"
 
 # Upload the result as an artifact (use relative path for consistency)
-buildkite-agent artifact upload "$(pwd)/results/${INTEGRATION}.json"
+buildkite-agent artifact upload "results/${INTEGRATION}.json"
 
 echo "✅ Result uploaded as artifact"
