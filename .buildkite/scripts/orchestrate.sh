@@ -63,8 +63,6 @@ for integration in "${INTEGRATIONS[@]}"; do
 done
 
 cat >> "${PIPELINE_FILE}" <<EOF
-    artifact_paths:
-      - "results/{{matrix.integration}}.json"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_URL: "${ISSUE_URL}"
@@ -78,14 +76,14 @@ cat >> "${PIPELINE_FILE}" <<EOF
     key: "summarize"
     depends_on: "check"
     command: ".buildkite/scripts/summarize_results.sh"
-    artifact_paths:
-      - "build-summary.json"
-      - "github-comment.md"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_REPO: "${ISSUE_REPO}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
 EOF
+
+echo; echo "Generated dynamic pipeline YAML:"
+cat "${PIPELINE_FILE}"
 
 # ---- Optional: validate YAML if yq is present ----
 if command -v yq >/dev/null 2>&1; then
