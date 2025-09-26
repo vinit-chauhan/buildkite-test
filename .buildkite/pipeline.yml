@@ -1,6 +1,3 @@
 steps:
   - label: ":gear: Setup and Orchestrate"
     command: ".buildkite/scripts/orchestrate.sh"
-    agents:
-      queue: "default"
-
