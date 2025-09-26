@@ -100,7 +100,10 @@ cat >> dynamic-pipeline.yml << EOF
   - label: ":memo: Summarize Results"
     key: "summarize"
     depends_on: "check"
-    command: ".buildkite/scripts/summarize_results.sh"
+    command: |
+      mkdir -p results
+      buildkite-agent artifact download "results/*.json" results/
+      .buildkite/scripts/summarize_results.sh
     agents:
       queue: "default"
     env:

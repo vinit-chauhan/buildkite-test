@@ -26,7 +26,18 @@ echo ""
 echo "Downloading result artifacts..."
 
 mkdir -p results
-buildkite-agent artifact download "results/*.json" .
+
+# Try to download artifacts if buildkite-agent is available
+if command -v buildkite-agent >/dev/null 2>&1; then
+    echo "Attempting to download artifacts using buildkite-agent..."
+    if buildkite-agent artifact download "results/*.json" . 2>/dev/null; then
+        echo "✅ Successfully downloaded artifacts"
+    else
+        echo "⚠️ No artifacts found to download, will check for local result files"
+    fi
+else
+    echo "⚠️ buildkite-agent not available, checking for local result files"
+fi
 
 # Check if we have any results
 if [[ ! -d results ]] || [[ -z "$(ls -A results 2>/dev/null)" ]]; then
@@ -181,9 +192,17 @@ else
     exit 1
 fi
 
-# Upload summary as artifact
-buildkite-agent artifact upload "$SUMMARY_FILE"
-buildkite-agent artifact upload "github-comment.md"
+# Upload summary as artifact if buildkite-agent is available
+if command -v buildkite-agent >/dev/null 2>&1; then
+    echo "Uploading summary artifacts..."
+    buildkite-agent artifact upload "$SUMMARY_FILE"
+    buildkite-agent artifact upload "github-comment.md"
+    echo "✅ Summary artifacts uploaded"
+else
+    echo "⚠️ buildkite-agent not available, artifacts saved locally:"
+    echo "  - $SUMMARY_FILE"
+    echo "  - github-comment.md"
+fi
 
 # Set build status based on results
 if [[ $FAILED_COUNT -eq 0 ]]; then
