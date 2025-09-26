@@ -16,6 +16,7 @@ missing_vars=()
 [[ -z "${INTEGRATIONS_JSON:-}" ]] && missing_vars+=("INTEGRATIONS_JSON")
 [[ -z "${GITHUB_TOKEN:-}" ]] && missing_vars+=("GITHUB_TOKEN")
 [[ -z "${GITHUB_PR_TOKEN:-}" ]] && missing_vars+=("GITHUB_PR_TOKEN")
+[[ -z "${BUILDKITE_AGENT_META_DATA_QUEUE:-}" ]] && missing_vars+=("BUILDKITE_AGENT_META_DATA_QUEUE")
 
 if [[ ${#missing_vars[@]} -gt 0 ]]; then
     echo "❌ Missing required environment variables:"
@@ -35,6 +36,9 @@ if ! echo "${INTEGRATIONS_JSON}" | jq empty 2>/dev/null; then
     echo "❌ Invalid JSON in INTEGRATIONS_JSON"
     exit 1
 fi
+
+QUEUE="${BUILDKITE_AGENT_META_DATA_QUEUE:-default}"
+echo "Using agent queue: ${QUEUE}"
 
 # Extract integrations array
 INTEGRATIONS=$(echo "${INTEGRATIONS_JSON}" | jq -r '.[]' 2>/dev/null || echo "")
@@ -89,13 +93,14 @@ done
 cat >> dynamic-pipeline.yml << EOF
     artifact_paths: "results/{{matrix.integration}}.json"
     agents:
-      queue: "default"
+      queue: "${QUEUE}"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_URL: "${ISSUE_URL}"
       ISSUE_REPO: "${ISSUE_REPO}"
       GITHUB_TOKEN: "${GITHUB_PR_TOKEN}"
       INTEGRATION: "{{matrix.integration}}"
+      QUEUE: "${QUEUE}"
 
   - label: ":memo: Summarize Results"
     key: "summarize"
@@ -105,11 +110,12 @@ cat >> dynamic-pipeline.yml << EOF
       buildkite-agent artifact download "results/*.json" results/
       .buildkite/scripts/summarize_results.sh
     agents:
-      queue: "default"
+      queue: "${QUEUE}"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_REPO: "${ISSUE_REPO}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
+      QUEUE: "${QUEUE}"
 EOF
 
 echo "Generated pipeline:"

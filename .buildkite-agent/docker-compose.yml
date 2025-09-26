@@ -1,0 +1,15 @@
+services:
+  agent:
+    build: .
+    container_name: buildkite-agent
+    restart: unless-stopped
+    volumes:
+      # Workspace + plugins/hooks
+      - ./builds:/builds
+      - ./plugins:/buildkite/plugins
+      - ./hooks:/buildkite/hooks
+      - ./buildkite-agent.cfg:/buildkite/buildkite-agent.cfg:ro
+      # SSH material for git checkouts
+      - ./.ssh:/root/.ssh
+      # Docker socket so docker/* plugins can run containers
+      # - /var/run/docker.sock:/var/run/docker.sock
