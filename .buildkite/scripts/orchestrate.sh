@@ -86,7 +86,7 @@ echo "${INTEGRATIONS_ARRAY}" | while IFS= read -r integration; do
 done
 
 cat >> dynamic-pipeline.yml << EOF
-    artifact_paths: "/results/{{matrix.integration}}.json"
+    artifact_paths: "results/{{matrix.integration}}.json"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_URL: "${ISSUE_URL}"

@@ -495,9 +495,6 @@ echo "=== Integration Check Complete ==="
 echo "Status: $(jq -r '.status' "${RESULT_FILE}")"
 echo "Result file: ${RESULT_FILE}"
 
-echo "uploading at results/${INTEGRATION}.json" 
-
-# Upload the result as an artifact (use relative path for consistency)
-buildkite-agent artifact upload "/results/${INTEGRATION}.json" 
+buildkite-agent artifact upload "results/${INTEGRATION}.json"
 
 echo "✅ Result uploaded as artifact"
