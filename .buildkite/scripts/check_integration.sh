@@ -119,6 +119,37 @@ setup_github_cli() {
     fi
 }
 
+setup_elastic_package() {
+    # Install elastic-package if not present
+    if ! command -v elastic-package >/dev/null 2>&1; then
+        echo "Installing elastic-package..."
+        
+        # Try to download and install elastic-package
+        ELASTIC_PACKAGE_VERSION="0.115.0"  # Use a known stable version
+        DOWNLOAD_URL="https://github.com/elastic/elastic-package/releases/download/v${ELASTIC_PACKAGE_VERSION}/elastic-package_${ELASTIC_PACKAGE_VERSION}_linux_amd64.tar.gz"
+        
+        mkdir -p ~/bin
+        cd ~/bin
+        
+        if curl -sL "${DOWNLOAD_URL}" | tar xz; then
+            chmod +x elastic-package
+            export PATH="~/bin:$PATH"
+            add_check_result "elastic_package_install" "passed" "Successfully installed elastic-package v${ELASTIC_PACKAGE_VERSION}"
+        else
+            update_result "failed" "Failed to install elastic-package"
+            add_check_result "elastic_package_install" "failed" "Could not download or extract elastic-package"
+            exit 1
+        fi
+        
+        cd - >/dev/null
+    else
+        add_check_result "elastic_package_install" "passed" "elastic-package already available"
+    fi
+
+    echo "elastic-package version: $(elastic-package version)"
+    echo "✅ elastic-package is ready"
+}
+
 # Function to run elastic-package changelog and build, then create PR
 create_integration_pr() {
     local integration_path="$1"
@@ -328,34 +359,7 @@ fi
 add_check_result "integration_exists" "passed" "Integration directory found"
 echo "✅ Integration found at: ${INTEGRATION_PATH}"
 
-# Install elastic-package if not present
-if ! command -v elastic-package >/dev/null 2>&1; then
-    echo "Installing elastic-package..."
-    
-    # Try to download and install elastic-package
-    ELASTIC_PACKAGE_VERSION="0.115.0"  # Use a known stable version
-    DOWNLOAD_URL="https://github.com/elastic/elastic-package/releases/download/v${ELASTIC_PACKAGE_VERSION}/elastic-package_${ELASTIC_PACKAGE_VERSION}_linux_amd64.tar.gz"
-    
-    mkdir -p ~/bin
-    cd ~/bin
-    
-    if curl -sL "${DOWNLOAD_URL}" | tar xz; then
-        chmod +x elastic-package
-        export PATH="~/bin:$PATH"
-        add_check_result "elastic_package_install" "passed" "Successfully installed elastic-package v${ELASTIC_PACKAGE_VERSION}"
-    else
-        update_result "failed" "Failed to install elastic-package"
-        add_check_result "elastic_package_install" "failed" "Could not download or extract elastic-package"
-        exit 1
-    fi
-    
-    cd - >/dev/null
-else
-    add_check_result "elastic_package_install" "passed" "elastic-package already available"
-fi
-
-echo "✅ elastic-package is ready"
-echo "elastic-package version: $(elastic-package version)"
+setup_elastic_package;
 
 echo ""
 echo "Running elastic-package check on ${INTEGRATION}..."

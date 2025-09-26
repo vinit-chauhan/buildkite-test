@@ -53,7 +53,6 @@ cat > artifacts/build-env.txt << EOF
 ISSUE_NUMBER=${ISSUE_NUMBER}
 ISSUE_URL=${ISSUE_URL}
 ISSUE_REPO=${ISSUE_REPO}
-GITHUB_TOKEN=${GITHUB_TOKEN}
 EOF
 
 # Generate dynamic pipeline with matrix jobs
@@ -104,9 +103,6 @@ cat >> dynamic-pipeline.yml << EOF
       ISSUE_REPO: "${ISSUE_REPO}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
 EOF
-
-echo "Generated pipeline:"
-cat dynamic-pipeline.yml
 
 # Validate the YAML before uploading
 if command -v yq >/dev/null 2>&1; then
