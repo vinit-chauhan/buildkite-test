@@ -82,9 +82,28 @@ setup_github_cli() {
     add_check_result "gh_install" "passed" "GitHub CLI available"
   fi
 
-  echo "${GITHUB_TOKEN:?GITHUB_TOKEN required}" | gh auth login --with-token >/dev/null \
-    && add_check_result "gh_auth" "passed" "Authenticated GitHub CLI" \
-    || { add_check_result "gh_auth" "failed" "GitHub CLI auth failed"; return 1; }
+  if gh auth status >/dev/null 2>&1; then
+    add_check_result "gh_auth" "passed" "GitHub CLI already authenticated"
+    echo "✅ GitHub CLI already authenticated"
+  else
+    # Try token authentication
+    if echo "${GITHUB_TOKEN}" | gh auth login --with-token >/dev/null 2>&1; then
+      add_check_result "gh_auth" "passed" "Successfully authenticated GitHub CLI"
+      echo "✅ GitHub CLI authenticated successfully"
+    else
+      # Fallback: Check if GITHUB_TOKEN environment variable authentication works
+      if [[ -n "${GITHUB_TOKEN:-}" ]] && gh auth status >/dev/null 2>&1; then
+        add_check_result "gh_auth" "passed" "GitHub CLI using environment token"
+        echo "✅ GitHub CLI using environment token authentication"
+      else
+        add_check_result "gh_auth" "failed" "Failed to authenticate GitHub CLI"
+        echo "❌ Failed to authenticate GitHub CLI"
+        echo "Debug: GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
+        gh auth status 2>&1 || true
+        return 1
+      fi
+    fi
+  fi
 
   gh repo set-default "${REPOSITORY_NAME}" >/dev/null 2>&1 \
     && add_check_result "gh_repo_default" "passed" "Default repo set to ${REPOSITORY_NAME}" \
