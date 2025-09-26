@@ -35,7 +35,7 @@ EOF
 json_inplace() {
   # $1: jq program, operates on $RESULT_FILE atomically
   local tmp; tmp="$(mktemp)"
-  jq "$1" "${RESULT_FILE}" > "${tmp}" && mv "${tmp}" "${RESULT_FILE}"
+  jq "$@" "${RESULT_FILE}" > "${tmp}" && mv "${tmp}" "${RESULT_FILE}"
 }
 
 update_result() {

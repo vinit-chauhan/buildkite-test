@@ -1,76 +1,53 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Simple orchestration script that receives data from GitHub Actions
-# and creates matrix jobs for each integration
+# Orchestrates matrix checks per integration and uploads a child pipeline.
 
 echo "=== Integration Check Orchestrator ==="
 echo "Build: ${BUILDKITE_BUILD_NUMBER:-unknown}"
 echo "Pipeline: ${BUILDKITE_PIPELINE_SLUG:-unknown}"
 
-# Check required environment variables from GitHub Actions
-missing_vars=()
-[[ -z "${ISSUE_NUMBER:-}" ]] && missing_vars+=("ISSUE_NUMBER")
-[[ -z "${ISSUE_URL:-}" ]] && missing_vars+=("ISSUE_URL") 
-[[ -z "${ISSUE_REPO:-}" ]] && missing_vars+=("ISSUE_REPO")
-[[ -z "${INTEGRATIONS_JSON:-}" ]] && missing_vars+=("INTEGRATIONS_JSON")
-[[ -z "${GITHUB_TOKEN:-}" ]] && missing_vars+=("GITHUB_TOKEN")
-[[ -z "${GITHUB_PR_TOKEN:-}" ]] && missing_vars+=("GITHUB_PR_TOKEN")
-
-if [[ ${#missing_vars[@]} -gt 0 ]]; then
-    echo "❌ Missing required environment variables:"
-    printf '  - %s\n' "${missing_vars[@]}"
-    echo ""
-    echo "Available environment variables:"
-    env | grep -E '^(BUILDKITE_|GITHUB_|ISSUE_|INTEGRATIONS_)' | sort
-    exit 1
+# ---- Required env ----
+missing=()
+[[ -z "${ISSUE_NUMBER:-}"      ]] && missing+=("ISSUE_NUMBER")
+[[ -z "${ISSUE_URL:-}"         ]] && missing+=("ISSUE_URL")
+[[ -z "${ISSUE_REPO:-}"        ]] && missing+=("ISSUE_REPO")
+[[ -z "${INTEGRATIONS_JSON:-}" ]] && missing+=("INTEGRATIONS_JSON")
+[[ -z "${GITHUB_TOKEN:-}"      ]] && missing+=("GITHUB_TOKEN")
+[[ -z "${GITHUB_PR_TOKEN:-}"   ]] && missing+=("GITHUB_PR_TOKEN")
+if (( ${#missing[@]} )); then
+  echo "❌ Missing env:"
+  printf '  - %s\n' "${missing[@]}"
+  echo; echo "Available (filtered):"
+  env | grep -E '^(BUILDKITE_|GITHUB_|ISSUE_|INTEGRATIONS_)' | sort || true
+  exit 1
 fi
 
 echo "✅ All required variables present"
 echo "Issue: #${ISSUE_NUMBER} from ${ISSUE_REPO}"
 echo "Integrations JSON: ${INTEGRATIONS_JSON}"
 
-# Validate integrations JSON
-if ! echo "${INTEGRATIONS_JSON}" | jq empty 2>/dev/null; then
-    echo "❌ Invalid JSON in INTEGRATIONS_JSON"
-    exit 1
+# ---- Validate and extract integrations ----
+if ! echo "${INTEGRATIONS_JSON}" | jq -e 'type=="array" and length>0' >/dev/null; then
+  echo "❌ INTEGRATIONS_JSON must be a non-empty JSON array"; exit 1
 fi
 
-# Extract integrations array
-INTEGRATIONS=$(echo "${INTEGRATIONS_JSON}" | jq -r '.[]' 2>/dev/null || echo "")
+mapfile -t INTEGRATIONS < <(echo "${INTEGRATIONS_JSON}" | jq -r '.[]')
+echo "Found integrations:"; for i in "${INTEGRATIONS[@]}"; do echo "  - ${i}"; done
 
-if [[ -z "${INTEGRATIONS}" ]]; then
-    echo "❌ No integrations found in JSON"
-    exit 1
-fi
-
-echo "Found integrations:"
-echo "${INTEGRATIONS_JSON}" | jq -r '.[]' | sed 's/^/  - /'
-
-# Store environment variables for downstream jobs
+# ---- Persist minimal shared context (optional) ----
 mkdir -p artifacts
-cat > artifacts/build-env.txt << EOF
+cat > artifacts/build-env.txt <<EOF
 ISSUE_NUMBER=${ISSUE_NUMBER}
 ISSUE_URL=${ISSUE_URL}
 ISSUE_REPO=${ISSUE_REPO}
 EOF
 
-# Generate dynamic pipeline with matrix jobs
-echo ""
-echo "Generating dynamic pipeline..."
+# ---- Generate dynamic pipeline YAML ----
+PIPELINE_FILE="dynamic-pipeline.yml"
+: > "${PIPELINE_FILE}"
 
-# Debug: Show the integrations we're working with
-echo "Debug: INTEGRATIONS_JSON content:"
-echo "${INTEGRATIONS_JSON}"
-echo "Debug: Parsing integrations:"
-echo "${INTEGRATIONS_JSON}" | jq -r '.[]' | while IFS= read -r integration; do
-    echo "  Integration: '${integration}'"
-done
-
-# Create YAML for matrix setup - ensure proper formatting
-INTEGRATIONS_ARRAY=$(echo "${INTEGRATIONS_JSON}" | jq -r '.[]')
-
-cat > dynamic-pipeline.yml << 'EOF'
+cat >> "${PIPELINE_FILE}" <<'YAML'
 steps:
   - label: ":package: Check {{matrix.integration}}"
     key: "check"
@@ -78,19 +55,22 @@ steps:
     matrix:
       setup:
         integration:
-EOF
+YAML
 
-# Add each integration as a YAML array item
-echo "${INTEGRATIONS_ARRAY}" | while IFS= read -r integration; do
-    echo "          - \"${integration}\"" >> dynamic-pipeline.yml
+for integration in "${INTEGRATIONS[@]}"; do
+  # simple YAML-safe quoting (names expected like "cisco_duo")
+  printf '          - "%s"\n' "${integration}" >> "${PIPELINE_FILE}"
 done
 
-cat >> dynamic-pipeline.yml << EOF
-    artifact_paths: "results/{{matrix.integration}}.json"
+cat >> "${PIPELINE_FILE}" <<EOF
+    artifact_paths:
+      - "results/{{matrix.integration}}.json"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_URL: "${ISSUE_URL}"
       ISSUE_REPO: "${ISSUE_REPO}"
+      # NOTE: Passing tokens here will interpolate into the uploaded pipeline.
+      # Prefer pipeline/cluster secrets if available.
       GITHUB_TOKEN: "${GITHUB_PR_TOKEN}"
       INTEGRATION: "{{matrix.integration}}"
 
@@ -98,29 +78,28 @@ cat >> dynamic-pipeline.yml << EOF
     key: "summarize"
     depends_on: "check"
     command: ".buildkite/scripts/summarize_results.sh"
+    artifact_paths:
+      - "build-summary.json"
+      - "github-comment.md"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_REPO: "${ISSUE_REPO}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
 EOF
 
-# Validate the YAML before uploading
+# ---- Optional: validate YAML if yq is present ----
 if command -v yq >/dev/null 2>&1; then
-    echo ""
-    echo "Validating generated YAML..."
-    if yq eval '.' dynamic-pipeline.yml >/dev/null 2>&1; then
-        echo "✅ YAML is valid"
-    else
-        echo "❌ Generated YAML is invalid:"
-        yq eval '.' dynamic-pipeline.yml 2>&1 || true
-        exit 1
-    fi
+  echo; echo "Validating generated YAML..."
+  yq eval '.' "${PIPELINE_FILE}" >/dev/null \
+    && echo "✅ YAML is valid" \
+    || { echo "❌ YAML invalid"; yq eval '.' "${PIPELINE_FILE}" || true; exit 1; }
 else
-    echo "⚠️  yq not available, skipping YAML validation"
+  echo "⚠️ yq not available, skipping YAML validation"
 fi
 
-echo ""
-echo "Uploading dynamic pipeline..."
-buildkite-agent pipeline upload dynamic-pipeline.yml
+# ---- Upload child pipeline (reject secrets by default) ----
+echo; echo "Uploading dynamic pipeline..."
+export BUILDKITE_AGENT_PIPELINE_UPLOAD_REJECT_SECRETS="${BUILDKITE_AGENT_PIPELINE_UPLOAD_REJECT_SECRETS:-true}"
+buildkite-agent pipeline upload "${PIPELINE_FILE}"
 
 echo "✅ Pipeline uploaded successfully"
