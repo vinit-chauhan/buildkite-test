@@ -49,32 +49,31 @@ PIPELINE_FILE="dynamic-pipeline.yml"
 
 cat >> "${PIPELINE_FILE}" <<'YAML'
 steps:
-  - label: ":package: Check {{matrix.integration}}"
-    key: "check"
-    command: ".buildkite/scripts/check_integration.sh"
-    matrix:
-      setup:
-        integration:
+  - group: ":repeat-button: Bulk update integrations"
+    key: "bulk-action"
+    steps:
 YAML
 
 for integration in "${INTEGRATIONS[@]}"; do
-  # simple YAML-safe quoting (names expected like "cisco_duo")
-  printf '          - "%s"\n' "${integration}" >> "${PIPELINE_FILE}"
+  cat >> "${PIPELINE_FILE}" <<EOF
+      - label: ":construction: Updating ${integration}"
+        command: ".buildkite/scripts/check_integration.sh"
+        env:
+          ISSUE_NUMBER: "${ISSUE_NUMBER}"
+          ISSUE_URL: "${ISSUE_URL}"
+          ISSUE_REPO: "${ISSUE_REPO}"
+          # NOTE: Passing tokens here will interpolate into the uploaded pipeline.
+          # Prefer pipeline/cluster secrets if available.
+          GITHUB_TOKEN: "${GITHUB_PR_TOKEN}"
+          INTEGRATION: "${integration}"
+EOF
 done
 
 cat >> "${PIPELINE_FILE}" <<EOF
-    env:
-      ISSUE_NUMBER: "${ISSUE_NUMBER}"
-      ISSUE_URL: "${ISSUE_URL}"
-      ISSUE_REPO: "${ISSUE_REPO}"
-      # NOTE: Passing tokens here will interpolate into the uploaded pipeline.
-      # Prefer pipeline/cluster secrets if available.
-      GITHUB_TOKEN: "${GITHUB_PR_TOKEN}"
-      INTEGRATION: "{{matrix.integration}}"
-
+    
   - label: ":memo: Summarize Results"
     key: "summarize"
-    depends_on: "check"
+    depends_on: "bulk-action"
     command: ".buildkite/scripts/summarize_results.sh"
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
