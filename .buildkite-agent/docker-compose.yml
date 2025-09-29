@@ -1,8 +1,42 @@
 services:
-  agent:
+  agent0:
     build: .
-    container_name: buildkite-agent
+    container_name: buildkite-agent-0
     restart: unless-stopped
+    environment:
+      - BUILDKITE_AGENT_TOKEN=${AGENT_TOKEN_0}
+    volumes:
+      # Workspace + plugins/hooks
+      - ./builds:/builds
+      - ./plugins:/buildkite/plugins
+      - ./hooks:/buildkite/hooks
+      - ./buildkite-agent.cfg:/buildkite/buildkite-agent.cfg:ro
+      # SSH material for git checkouts
+      - ./.ssh:/root/.ssh
+      # Docker socket so docker/* plugins can run containers
+      # - /var/run/docker.sock:/var/run/docker.sock
+  agent-1:
+    build: .
+    container_name: buildkite-agent-1
+    restart: unless-stopped
+    environment:
+      - BUILDKITE_AGENT_TOKEN=${AGENT_TOKEN_1}
+    volumes:
+      # Workspace + plugins/hooks
+      - ./builds:/builds
+      - ./plugins:/buildkite/plugins
+      - ./hooks:/buildkite/hooks
+      - ./buildkite-agent.cfg:/buildkite/buildkite-agent.cfg:ro
+      # SSH material for git checkouts
+      - ./.ssh:/root/.ssh
+      # Docker socket so docker/* plugins can run containers
+      # - /var/run/docker.sock:/var/run/docker.sock
+  agent-2:
+    build: .
+    container_name: buildkite-agent-2
+    restart: unless-stopped
+    environment:
+      - BUILDKITE_AGENT_TOKEN=${AGENT_TOKEN_2}
     volumes:
       # Workspace + plugins/hooks
       - ./builds:/builds
