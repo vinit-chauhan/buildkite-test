@@ -60,6 +60,18 @@ run_integration_check_commands() {
   echo "${overall_status}"
 }
 
+# ---------- PR Configuration ----------
+PR_TITLE="feat: Update ${INTEGRATION} integration - elastic-package validation"
+
+PR_BODY="## 🔧 Elastic Package Integration Update
+
+This PR contains automated improvements for the **${INTEGRATION}** integration using elastic-package tools.
+
+### Changes Made:
+- ✅ Ran elastic-package check for validation
+- ✅ Added changelog entry for tracking
+- ✅ Rebuilt package with latest elastic-package build"
+
 # ---------- Main Execution ----------
-# Use the helper's run_workflow function
-run_workflow "setup_elastic_package_tools" "run_integration_check_commands"
+# Use the helper's run_workflow function with custom PR title and body
+run_workflow "setup_elastic_package_tools" "run_integration_check_commands" "${PR_TITLE}" "${PR_BODY}"

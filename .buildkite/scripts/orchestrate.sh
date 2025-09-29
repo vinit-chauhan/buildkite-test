@@ -79,7 +79,7 @@ cat >> "${PIPELINE_FILE}" <<EOF
     env:
       ISSUE_NUMBER: "${ISSUE_NUMBER}"
       ISSUE_REPO: "${ISSUE_REPO}"
-      GITHUB_TOKEN: "${GITHUB_PR_TOKEN}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
 EOF
 
 # ---- Optional: validate YAML if yq is present ----
