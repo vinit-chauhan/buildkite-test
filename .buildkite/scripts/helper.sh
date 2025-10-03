@@ -183,7 +183,7 @@ setup_github_cli() {
 
 # ---------- Pull Request Management ----------
 raise_pr() {
-  local branch_name="$1" commit_message="$2" pr_title="$3" pr_body="$4"
+  local branch_name="$1" commit_message="$2" pr_title="$3" pr_body="$4" pr_type="${5:-enhancement}"
   
   echo "--- Creating Pull Request"
   git_cfg_user
@@ -216,8 +216,16 @@ raise_pr() {
     json_inplace --arg url "$pr_url" --arg br "$branch_name" '.pr_url=$url | .pr_branch=$br'
     echo "✅ PR created: ${pr_url}"
     
+    # Add bumped up version in changelog and manifest
+    if [[ "$pr_type" == "bugfix" ]]; then
+      version_bump="patch"
+    elif [[ "$pr_type" == "enhancement" ]]; then
+      version_bump="minor"
+    fi
+    increment_version "${version_bump}"
+
     # Add changelog entry referencing the PR
-    update_changelog_pr_link "${pr_url}" "${branch_name}"
+    add_changelog_entry "${5:-enhancement}" "${pr_title}" "${pr_url}"
   else
     add_command_result "pr_creation" "failed" "Failed to create PR"
     popd >/dev/null
@@ -229,8 +237,8 @@ raise_pr() {
 }
 
 # ---------- Changelog Management ----------
-default_changelog_entry() {
-  local change_type="$1" description="$2"
+add_changelog_entry() {
+  local change_type="$1" description="$2" pr_link="${3:-}"
 
   pushd "${WORKDIR}/elastic-integrations" >/dev/null
   if run_command "changelog_add" "Add changelog entry" "${WORKDIR}/elastic-integrations/packages/${INTEGRATION}" \
@@ -281,6 +289,54 @@ update_changelog_pr_link() {
   return 0
 }
 
+# ---------- Increment version ----------
+
+increment_version() {
+    local change_type=$1
+
+    pushd "${WORKDIR}/elastic-integrations/packages/${INTEGRATION}" >/dev/null
+
+    if ! command -v pysemver &> /dev/null
+    then
+        add_command_result "version_bump" "failed" "pysemver not installed"
+        return 1
+    fi
+
+    # Get the current version from package.json
+    current_version=$(yq .version ./manifest.yml)
+    if [[ -z "$current_version" ]]; then
+        add_command_result "version_bump" "failed" "Current version not found in manifest.yml"
+        return 1
+    fi
+
+    new_version=$(pysemver bump "$change_type" "$current_version")
+    if [[ -z "$new_version" ]]; then
+        add_command_result "version_bump" "failed" "Version bump failed"
+        return 1
+    fi
+
+    echo "Bumping version from $current_version to $new_version"
+
+    # Update the version in package.json
+    sed -i.bkp "s/^version: .*/version: \"$new_version\"/" manifest.yml
+    if [[ $? -ne 0 ]]; then
+        add_command_result "version_bump" "failed" "Failed to update version in manifest.yml"
+        return 1
+    fi
+    add_command_result "version_bump" "passed" "Version updated to $new_version"
+    rm manifest.yml.bkp
+
+    new_entry="- version: \"$new_version\"\n  changes:" 
+    sed -i.bkp "2s/^/$new_entry\n/" changelog.yml
+    if [[ $? -ne 0 ]]; then
+        add_command_result "version_bump" "failed" "Failed to update changelog.yml"
+        return 1
+    fi
+    add_command_result "changelog_update" "passed" "Changelog updated with new version"
+    rm changelog.yml.bkp
+
+    popd >/dev/null
+}
 
 # ---------- Elastic Package Tool Setup ----------
 setup_elastic_package_tools() {

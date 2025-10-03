@@ -40,8 +40,11 @@ run_integration_check_commands() {
     overall_status="failed"
   fi
   
-  # Command 2: Add changelog entry (non-critical)
-  default_changelog_entry "enhancement" "Automated update via elastic-package tools"
+  # Command 2: Append to README file.
+  cat <<EOF >> "${integration_path}/_dev/build/docs/README.md"
+## Dummy Section
+This is a dummy section added for testing purposes.
+EOF
   
   # Command 3: Build package
   if ! run_command "package_build" "Build integration package" "${integration_path}" \
@@ -53,7 +56,7 @@ run_integration_check_commands() {
 }
 
 # ---------- PR Configuration ----------
-PR_TITLE="feat: Update ${INTEGRATION} integration - elastic-package validation"
+PR_TITLE="[bulk][dummy_task] Update ${INTEGRATION} integration"
 PR_TYPE="${PR_TYPE:-"enhancement"}"
 PR_BODY="## 🔧 Elastic Package Integration Update
 
