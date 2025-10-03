@@ -226,6 +226,8 @@ raise_pr() {
 
     # Add changelog entry referencing the PR
     add_changelog_entry "${5:-enhancement}" "${pr_title}" "${pr_url}"
+
+    commit_changes "${branch_name}"
   else
     add_command_result "pr_creation" "failed" "Failed to create PR"
     popd >/dev/null
@@ -245,7 +247,7 @@ add_changelog_entry() {
       elastic-package changelog add \
         --type "${change_type}" \
         --description "${description}" \
-        --link "https://github.com/elastic/integrations/pull/1"; then
+        --link "${pr_link}"; then
     echo "✅ Changelog added"
   else
     echo "⚠️ Changelog add failed (non-critical)"
@@ -256,11 +258,9 @@ add_changelog_entry() {
 update_changelog_pr_link() {
   local pr_url="$1" branch_name="$2" 
 
-  pushd "${WORKDIR}/elastic-integrations" >/dev/null
+  pushd "${WORKDIR}/elastic-integrations/packages/${INTEGRATION}" >/dev/null
   git checkout "${branch_name}"
 
-  pushd "packages/${INTEGRATION}" >/dev/null
-  
   if ! grep -q "${pr_url}" changelog.yml; then
     sed -i.bkp "1,/link:/s|link: .*|link: ${pr_url}|" changelog.yml
     rm changelog.yml.bkp
@@ -268,25 +268,32 @@ update_changelog_pr_link() {
   else
     add_command_result "changelog_update" "failed" "Unable to update changelog with PR link"
     popd >/dev/null
-    popd >/dev/null
     return 0
   fi
+
+  popd >/dev/null
+  return 0
+}
+
+commit_changes() {
+  local branch_name="$1"
+
+  pushd "${WORKDIR}/elastic-integrations" >/dev/null
+  git checkout "${branch_name}"
 
   git add -A
 
   if git diff --staged --quiet; then
-    add_command_result "changelog_commit" "skipped" "No changelog changes to commit"
-    popd >/dev/null
+    add_command_result "commit_changes" "skipped" "No changelog changes to commit"
     popd >/dev/null
     return 0
   fi
 
-  git commit -m "chore: Add changelog entry - automated update"
-  git push
+  git commit -m "chore: Add changelog entry and version bump - automated update"
+  git push origin "${branch_name}"
 
+  add_command_result "commit_changes" "passed" "Committed changelog and version updates"
   popd >/dev/null
-  popd >/dev/null
-  return 0
 }
 
 # ---------- Increment version ----------
@@ -323,7 +330,7 @@ increment_version() {
         add_command_result "version_bump" "failed" "Failed to update version in manifest.yml"
         return 1
     fi
-    add_command_result "version_bump" "passed" "Version updated to $new_version"
+    add_command_result "version_bump" "in-progress" "Version updated to $new_version"
     rm manifest.yml.bkp
 
     new_entry="- version: \"$new_version\"\n  changes:" 
@@ -332,8 +339,8 @@ increment_version() {
         add_command_result "version_bump" "failed" "Failed to update changelog.yml"
         return 1
     fi
-    add_command_result "changelog_update" "passed" "Changelog updated with new version"
     rm changelog.yml.bkp
+    add_command_result "version_bump" "passed" "Changelog updated with new version"
 
     popd >/dev/null
 }
