@@ -257,7 +257,7 @@ update_changelog_pr_link() {
     sed "1,/link:/s|link: .*|link: ${pr_url}|" changelog.yml
     add_command_result "changelog_update" "passed" "Changelog updated with PR link"
   else
-    add_command_result "changelog_update" "skipped" "Changelog already contains PR link"
+    add_command_result "changelog_update" "failed" "Unable to update changelog with PR link"
     popd >/dev/null
     popd >/dev/null
     return 0
