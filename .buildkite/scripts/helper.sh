@@ -254,7 +254,8 @@ update_changelog_pr_link() {
   pushd "packages/${INTEGRATION}" >/dev/null
   
   if ! grep -q "${pr_url}" changelog.yml; then
-    sed "1,/link:/s|link: .*|link: ${pr_url}|" changelog.yml
+    sed -i.bkp "1,/link:/s|link: .*|link: ${pr_url}|" changelog.yml
+    rm changelog.yml.bkp
     add_command_result "changelog_update" "passed" "Changelog updated with PR link"
   else
     add_command_result "changelog_update" "failed" "Unable to update changelog with PR link"
@@ -264,10 +265,16 @@ update_changelog_pr_link() {
   fi
 
   git add -A
+
+  if git diff --staged --quiet; then
+    add_command_result "changelog_commit" "skipped" "No changelog changes to commit"
+    popd >/dev/null
+    popd >/dev/null
+    return 0
+  fi
+
   git commit -m "chore: Add changelog entry - automated update"
   git push
-
-  add_command_result "changelog_commit" "passed" "Changelog committed with PR link"
 
   popd >/dev/null
   popd >/dev/null
