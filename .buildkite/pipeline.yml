@@ -1,7 +1,10 @@
 steps:
   - label: "Install dependencies"
+    key: "env_setup"
     command: 
       - "sudo apt-get update -y && sudo apt-get install -y python3-pip"
       - "pip3 install semver"
   - label: ":gear: Setup and Orchestrate"
     command: ".buildkite/scripts/orchestrate.sh"
+    depends_on: "env_setup"
+    
