@@ -215,12 +215,66 @@ raise_pr() {
     add_command_result "pr_creation" "passed" "Created PR: ${pr_url}"
     json_inplace --arg url "$pr_url" --arg br "$branch_name" '.pr_url=$url | .pr_branch=$br'
     echo "✅ PR created: ${pr_url}"
+    
+    # Add changelog entry referencing the PR
+    update_changelog_pr_link "${pr_url}" "${branch_name}"
   else
     add_command_result "pr_creation" "failed" "Failed to create PR"
     popd >/dev/null
     return 1
   fi
+
+  popd >/dev/null
+  return 0
+}
+
+# ---------- Changelog Management ----------
+default_changelog_entry() {
+  local change_type="$1" description="$2"
+
+  pushd "${WORKDIR}/elastic-integrations" >/dev/null
+  if run_command "changelog_add" "Add changelog entry" "${WORKDIR}/elastic-integrations/packages/${INTEGRATION}" \
+      elastic-package changelog add \
+        --type "${change_type}" \
+        --description "${description}" \
+        --link "https://github.com/elastic/integrations/pull/1"; then
+    echo "✅ Changelog added"
+  else
+    echo "⚠️ Changelog add failed (non-critical)"
+  fi
+  popd >/dev/null
+}
+
+update_changelog_pr_link() {
+  local pr_url="$1" branch_name="$2" 
+
+  pushd "${WORKDIR}/elastic-integrations" >/dev/null
+  git checkout "${branch_name}"
+
+  pushd "packages/${INTEGRATION}" >/dev/null
   
+  if ! grep -q "${pr_url}" changelog.yml; then
+    sed "1,/link:/s|link: .*|link: ${pr_url}|" changelog.yml
+    add_command_result "changelog_update" "passed" "Changelog updated with PR link"
+  else
+    add_command_result "changelog_update" "skipped" "Changelog already contains PR link"
+    popd >/dev/null
+    popd >/dev/null
+    return 0
+  fi
+
+  popd >/dev/null  # Back to repo root
+
+  git add -A
+  if git diff --staged --quiet; then
+    add_command_result "changelog_commit" "skipped" "No changelog changes to commit"
+    popd >/dev/null
+    return 0
+  fi
+
+  git commit -m "chore: Add changelog entry - automated update"
+  git push origin "${branch_name}"
+
   popd >/dev/null
   return 0
 }
@@ -276,6 +330,7 @@ run_workflow() {
   local run_commands_func="$2"
   local custom_pr_title="${3:-}"
   local custom_pr_body="${4:-}"
+  local pr_type="${5:-enhancement}" # Default changelog type
   
   # Validate required variables
   validate_required_vars
@@ -383,8 +438,8 @@ $(jq -r '.commands[] | "- " + (if .status == "passed" then "✅" else "❌" end)
 
 ⚠️ **Note:** Some commands failed. This PR addresses the issues."
     fi
-    
-    raise_pr "${branch_name}" "${commit_message}" "${pr_title}" "${pr_body}"
+
+    raise_pr "${branch_name}" "${commit_message}" "${pr_title}" "${pr_body}" "${pr_type}"
   fi
 
   popd >/dev/null
@@ -410,7 +465,7 @@ AVAILABLE FUNCTIONS:
   Core Functions:
     - run_workflow(setup_func, commands_func, [pr_title], [pr_body])  # Main workflow runner
     - run_command(name, desc, dir, cmd...)     # Execute command with logging
-    - raise_pr(branch, commit_msg, title, body) # Create pull request
+    - raise_pr(branch, commit_msg, title, body, [pr_type]) # Create pull request
     
   Repository Management:
     - setup_repository()                       # Clone/update repo

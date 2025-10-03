@@ -41,15 +41,7 @@ run_integration_check_commands() {
   fi
   
   # Command 2: Add changelog entry (non-critical)
-  if run_command "changelog_add" "Add changelog entry" "${integration_path}" \
-      elastic-package changelog add \
-        --type "enhancement" \
-        --description "Automated integration improvements and fixes" \
-        --link "${ISSUE_URL:-https://github.com/${ISSUE_REPO}/issues/${ISSUE_NUMBER}}"; then
-    echo "✅ Changelog added"
-  else
-    echo "⚠️ Changelog add failed (non-critical)"
-  fi
+  default_changelog_entry "enhancement" "Automated update via elastic-package tools"
   
   # Command 3: Build package
   if ! run_command "package_build" "Build integration package" "${integration_path}" \
@@ -62,7 +54,7 @@ run_integration_check_commands() {
 
 # ---------- PR Configuration ----------
 PR_TITLE="feat: Update ${INTEGRATION} integration - elastic-package validation"
-
+PR_TYPE="${PR_TYPE:-"enhancement"}"
 PR_BODY="## 🔧 Elastic Package Integration Update
 
 This PR contains automated improvements for the **${INTEGRATION}** integration using elastic-package tools.
@@ -74,4 +66,4 @@ This PR contains automated improvements for the **${INTEGRATION}** integration u
 
 # ---------- Main Execution ----------
 # Use the helper's run_workflow function with custom PR title and body
-run_workflow "setup_elastic_package_tools" "run_integration_check_commands" "${PR_TITLE}" "${PR_BODY}"
+run_workflow "setup_elastic_package_tools" "run_integration_check_commands" "${PR_TITLE}" "${PR_BODY}" "${PR_TYPE}"
