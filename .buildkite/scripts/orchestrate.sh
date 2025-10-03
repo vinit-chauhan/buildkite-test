@@ -49,7 +49,7 @@ PIPELINE_FILE="dynamic-pipeline.yml"
 
 cat >> "${PIPELINE_FILE}" <<'YAML'
 steps:
-  - group: ":repeat-button: Bulk update integrations"
+  - group: ":construction: Bulk update integrations"
     key: "bulk-action"
     steps:
 YAML

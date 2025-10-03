@@ -263,18 +263,20 @@ update_changelog_pr_link() {
     return 0
   fi
 
-  popd >/dev/null  # Back to repo root
-
   git add -A
+
   if git diff --staged --quiet; then
+    git diff --staged
     add_command_result "changelog_commit" "skipped" "No changelog changes to commit"
+    popd >/dev/null
     popd >/dev/null
     return 0
   fi
 
   git commit -m "chore: Add changelog entry - automated update"
-  git push origin "${branch_name}"
+  git push
 
+  popd >/dev/null
   popd >/dev/null
   return 0
 }
